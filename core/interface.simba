@@ -1,0 +1,110 @@
+const
+  Interface_Boat = 0;
+  Interface_DuelTeleport = 1;
+  Interface_RecoilBreak = 2;
+  Interface_Talking_Collect = 3;
+  Interface_CollectedAll = 4;
+  Interface_CollectedSome = 5;
+
+{
+function Interface_Value(Interface_Const: Integer): Integer;
+begin
+  Case Interface_Const of
+    Interface_Coffer: Result := getItemAmount(Point(476, 56));
+    Interface_Absorption: Result := StrToIntDef(ExtractFromStr(Interface_GetChildText(202, 2, 9), Numbers), -1);
+    Interface_RewardPoints: Result := StrToIntDef(ExtractFromStr(Reflect.Widget.GetText(206, 2, 6), Numbers), -1);
+    Interface_OverloadsStored: Result := StrToIntDef(ExtractFromStr(Reflect.Widget.GetText(206, 6, 8), Numbers), -1);
+    Interface_AbsorptionStored: Result := StrToIntDef(ExtractFromStr(Reflect.Widget.GetText(206, 6, 11), Numbers), -1);
+    Interface_Points: Result := StrToIntDef(ExtractFromStr(Reflect.Widget.GetText(202, 2, 3), Numbers), -1);
+  end;
+end; }
+
+function Interface_Open(Interface_Const: Integer): Boolean;
+var
+  W, WChild: TReflectWidget;
+begin
+  Debug(Reflect.Widget.GetText(219, 0, 0));
+  case Interface_Const of
+    Interface_Boat: Result := (Pos('shrine', Reflect.Widget.GetText(219, 0, 0)) > 0);
+    Interface_DuelTeleport: Result := (Pos('teleport', Reflect.Widget.GetText(219, 0, 0)) > 0);
+    Interface_RecoilBreak: Result := (Pos('Status', Reflect.Widget.GetText(219, 0, 0)) > 0);
+    Interface_Talking_Collect: Result := (Pos('riestess', Reflect.Widget.GetText(231, 1)) > 0);
+    Interface_CollectedAll: Result := (Pos('I''ve returned it to you now.', Reflect.Widget.GetText(231, 3)) > 0);
+    Interface_CollectedSome: Result := (Pos('Clear some more inventory space and', Reflect.Widget.GetText(231, 3)) > 0);
+  end;
+end;
+
+function Interface_Wait(Interface_Const: Integer; WaitTime: Integer): boolean;
+var
+  T: TReflectTimer;
+begin
+  T.Restart;
+  repeat
+    Result := Interface_Open(Interface_Const);
+    Wait(100+Random(200));
+  until(Result)or(T.ElapsedTime > WaitTime);
+end;
+
+function Interface_GetTridentCharges: Integer;
+var
+  I: Integer;
+  S: String;
+begin
+  Result := 2500;
+  For I:=0 to 350 do
+    If (Pos('Your weapon has', Reflect.Widget.GetText(162, 43, I)))then
+    begin
+      S := Reflect.Widget.GetText(162, 43, I);
+      Debug(S);
+      Result := StrToIntDef(Between('has ', ' charges', S), 2500);
+      Writeln(Result);
+      Exit;
+    end;
+end;
+
+function Interface_PetDrop: Boolean;
+var
+  I: Integer;
+  S: String;
+begin
+  Result := False
+  For I:=0 to 60 do
+    If (Pos('funny feeling', Reflect.Widget.GetText(162, 43, I)))then
+    begin
+      S := Reflect.Widget.GetText(162, 43, I);
+      Debug(S);
+      Exit(True);
+    end;
+end;
+
+function Interface_GetKillCount: Integer;
+var
+  I: Integer;
+  S: String;
+begin
+  Result := -1;
+  For I:=0 to 20 do
+    If (Pos('Zulrah kill count', Reflect.Widget.GetText(162, 43, I)))then
+    begin
+      S := Reflect.Widget.GetText(162, 43, I);
+      Debug(S);
+      Result := StrToIntDef(Between('>', '<', S), -1);
+      Writeln(Result);
+      Exit;
+    end;
+end;
+
+function Interface_GetRecoilPoints: Integer;
+var
+  S: String;
+begin
+  Result := -1;
+  If (Pos('ring will shatter.', Reflect.Widget.GetText(162, 43, 0)))then
+  begin
+    S := Reflect.Widget.GetText(137, 2, 0);
+    Debug(S);
+    Result := StrToIntDef(Between('inflict ', ' more', S), -1);
+    Writeln(Result);
+    Exit;
+  end;
+end;

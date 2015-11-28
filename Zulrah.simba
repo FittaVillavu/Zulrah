@@ -1,0 +1,285 @@
+program Zulrahlicious;
+{$i core/includes.simba}
+
+Procedure Setup;
+begin
+  World := 0;  {0 = Random p2p world}
+
+  BreakMinMax := [20, 100];
+  BreakDurationMinMax := [5, 100];
+
+  locPlayer.Username := '';
+  locPlayer.Password := '';
+  locPlayer.Active := True;
+  locPlayer.Pin := '';
+
+  AmountPrayerPots := 2; {Under 60 prayer = 2 Prayer pots}
+  FoodName := 'Shark';
+  eatAt := [66, 60, 44, 35];
+            {Mage/PreLoop, Range, Melee, JAD}
+
+  RecoilOnJAD := True; {Try to put on a recoil during JAD}
+  MagicPotions := False; {Use magic potions?}
+
+  BaseEquip := ['Blessed spirit shield',
+                'Void knight top',
+                'Void knight robe',
+                'Mystic boots',
+                'Void knight gloves',
+                'Diamond bolts (e)',
+                'Occult necklace'];
+
+  MageEquip := ['Trident of the swamp',
+                'Zamorak cape',
+                'Void mage helm'];
+
+  RangeRapid := False;  {Switch to rapid? (Will get defence xp sometimes)}
+  RangeEquip := ['Rune crossbow',
+                 'Ava''s accumulator',
+                 'Void ranger helm'];
+
+end;
+
+procedure StartVars;
+var
+  I: Integer;
+begin
+  ScriptName := 'Zulrah';
+  ScriptRev := '1.01';
+  If World = 0 then
+    World := Reflect.Login.RandomWorld(True, False);
+
+  FInclude;
+  rand_MouseSpeed(True);
+  Setup;
+  setPatterns;
+  setLength(DropAmounts, Length(DropArray));
+  setLength(DropValue, Length(DropArray));
+
+
+  SetNextBreak;
+  Debug('Getting prices, please wait');
+  For I:=0 to High(DropValue)do
+    DropValue[I] := getPrice(DropIDs[I]);
+  Debug('Done loading all drop prices');
+
+  {Timers start}
+  BreakTimer.Restart;
+  posTimer.Restart;
+  eatTimer.Restart;
+  drinkTimer.Restart;
+  ringTimer.Restart;
+  venomTimer.Restart;
+  attackTimer.Restart;
+end;
+
+Procedure Progress;
+var
+  Graphic: TReflectionGraphics;
+  S: TStringArray;
+  BreakString: String;
+  I, C, Diff: Integer;
+begin
+   If ProgressTimer.IsRunning then
+    If (ProgressTimer.Elapsedtime < 3000) then
+      Exit;
+
+  Graphic := Reflect.Smart.Graphics;
+  Graphic.Clear;
+
+  Graphic.DrawBox(MCX1, MCY1, MCX2, MCY2, True, 3818059);
+
+  Diff := TotalValue;
+  TotalValue := 0;
+  For I:=0 to High(DropAmounts) do
+    If DropAmounts[I] > 0 then
+    begin
+      Graphic.DrawClippedText(DropArray[I] + ': ' + ToStr(DropAmounts[I]), 'SmallChars07', Point(7+((C div 22)*128), 17+((C mod 22)*14)), clGreen);
+      TotalValue := TotalValue + (DropAmounts[I] * DropValue[I]);
+      Inc(C);
+    end;
+
+  WriteAddInfo('GP', TotalValue-Diff);
+
+  S := ['                                             ' + ScriptName + ' v' + ScriptRev,
+        'Time running: ' + Reflect.Time.msToTime(GetTimeRunning, TIME_SHORT),
+        'Time till break: ' + Reflect.Time.msToTime(BreakAt - BreakTimer.ElapsedTime, TIME_SHORT),
+        'Kills: ' + ToStr(Kills) + ' - p/h: ' + ToStr(perHour(Kills)),
+        'Deaths: ' + ToStr(Deaths) + ' - p/h: ' + ToStr(perHour(Deaths)),
+        'Refills: ' + ToStr(Refills) + ' - p/h: ' + ToStr(perHour(Refills)),
+        'Valuable loot: ' + ToStr(Valuables),
+        'Aprox loot worth: ' + ToStr(TotalValue) + ' (' + ToStr(Round(TotalValue div 1000)) + 'k) - p/h: ' + ToStr(perHour(Round(TotalValue div 1000))) + 'k'];
+
+  For I:=0 to High(S) do
+    Graphic.DrawClippedText(S[I], 'UpChars07', Point(24+((I div 8)*200), 348+((I mod 8)*14)), clYellow);
+
+  Graphic.DrawClippedText('Made by Fitta', 'BigChars', Point(244, 384), clYellow);
+
+  ProgressTimer.Restart;
+end;
+
+procedure reArrangeItems;
+var
+  I: Integer;
+  P: TPoint;
+  Item: TReflectInvItem;
+  tSlot: TReflectInvItem;
+begin
+  If Random(50) = 1 then
+    RangeEquip := ShuffleStr(RangeEquip);
+  For I:=0 to High(RangeEquip)do
+    If Item.Find(RangeEquip[I])then
+      If Not (Item.GetInvSlot = I+1)then
+      begin
+        Debug('Moving ' + RangeEquip[I] + ' to it''s correct position..');
+        Reflect.Mouse.Move(Item.GetPoint, 0, 0);
+        P := getMousePnt;
+        HoldMouse(P.X, P.Y, mouse_Left);
+        Wait(50+Random(25));
+        tSlot._InvSlot := I+1;
+        Reflect.Mouse.Move(tSlot.GetPoint, 0, 0);
+        Wait(20+Random(25));
+        P := getMousePnt;
+        ReleaseMouse(P.X, P.Y, mouse_Left);
+        Wait(140+Random(25));
+      end;
+end;
+
+begin
+  ClearDebug;
+  StartVars;
+  setupPlayer;
+
+
+
+  Debug('Mainloop starting..');
+  Writeln(locPlayer.GetTile);
+
+  repeat
+    Progress;
+    Debug('Player active: ' + ToStr(locPlayer.Active));
+    If Not (locPlayer.IsLoggedIn) then
+    begin
+      Debug('Seems we''re not logged in, problems');
+      Debug_screen('Problems with login ' + ToStr(Reflect.Login.GetClientState));
+      Wait(1000+Random(2000));
+      SetupPlayer;
+    end;
+
+    Venom;
+    rand_Human;
+    rand_AFK;
+    If BreakTimer.ElapsedTime > BreakAt then
+    begin
+      ClearDebug;
+      Debug('Time for a well deserved break');
+      While locPlayer.IsLoggedIn do
+      begin
+        locPlayer.Logout;
+        Wait(5000+Random(2000));
+      end;
+      TakeBreak(60000*RandomRange(BreakDurationMinMax[0], BreakDurationMinMax[1]), 'Aprox loot worth: ' + ToStr(TotalValue));
+      BreakTimer.Restart;
+      setNextBreak;
+      setupPlayer;
+    end;
+    case inArea of
+
+      Area_Clanwars:
+      begin
+        Debug('Area @ Clan wars');
+
+        If Died then
+        begin
+          Debug('Clan wars @ Died = True');
+          If Not enterBank then
+          begin
+            Debug('Failed to open bank', True);
+            TerminateScript;
+          end else
+            Wait(200+Random(300));
+
+          If Not Reflect.Bank.Withdraw('Zul-andra teleport', 1)then
+          begin
+            Debug('No zul-andra teleport in bank', True);
+            TerminateScript;
+          end;
+
+          Wait(100+Random(100));
+          Reflect.Bank.Close;
+          Wait(400+Random(100));
+          rand_Human;
+          Teleport(Area_Zulandra);
+        end else
+        begin
+          Restock;
+          Progress;
+          If (Not (locPlayer.GetSkillLevel(Skill_Hitpoints) = locPlayer.GetMaxSkillLevel(Skill_Hitpoints)))or
+             (Not (locPlayer.GetSkillLevel(Skill_Prayer) = locPlayer.GetMaxSkillLevel(Skill_Prayer)))then
+          begin
+            Debug('We need to enter the portal to reset our stats..');
+            If Not EnterPortal then
+            begin
+              Debug('We failed to enter the portal', True);
+              TerminateScript;
+            end;
+
+            Wait(400+Random(400));
+            If Random(13) = 1 then
+            begin
+              If Not ExitPortal then
+              begin
+                Debug('We failed to exit the portal', True);
+                TerminateScript;
+              end;
+            end;
+          end;
+
+          Teleport(Area_ZulAndra);
+          Wait(200+Random(200));
+          rand_Human;
+          reArrangeItems;
+        end;
+      end;
+
+      Area_ZulAndra:
+      begin
+        Debug('Area @ Zul-andra');
+        If Died then
+        begin
+          Debug('Zul-andra @ Died = True');
+          rand_Human;
+          death_GetItems;
+          rand_Human;
+          reArrangeItems;
+          rand_Human;
+          Teleport(Area_ClanWars);
+          Died := False;
+        end else
+        begin
+          Debug('Time to board the boat');
+          If Not Reflect.Inv.IsFull then
+          begin
+            Debug('Are we really ready for zulrah?');
+            Teleport(Area_Clanwars);
+          end else
+          If enterBoat then
+            KillZulrah;
+        end;
+      end;
+
+      Area_InsidePortal: ExitPortal;
+
+      Area_Lumbridge, Area_Camalot, Area_Edge, Area_Falador:
+      begin
+        Debug('We have died.. :(');
+        Died := True;
+        Reflect.Gametab.TurnOffAllPrayers;
+        rand_Human;
+        minigame_Teleport;
+        Wait(1500+Random(500));
+      end;
+
+    end;
+  until(Failed);
+end.

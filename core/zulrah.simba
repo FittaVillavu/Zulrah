@@ -1,0 +1,578 @@
+function FormStr: String;
+begin
+  case Form of
+    Form_Melee: Result := 'Melee';
+    Form_Range: Result := 'Range';
+    Form_Mage: Result := 'Mage';
+  end;
+end;
+
+function getForm: boolean;
+begin
+  If NPC.Find('Zulrah') then
+    Form := NPC.GetID;
+
+  Result := (Form > 1);
+end;
+
+function interactingZulrah: boolean;
+begin
+  Result := (locPlayer.GetInteractingIndex > 1);
+end;
+
+function zulrahDead: Boolean;
+var
+  T: TReflectTimer;
+begin
+  If NPC.Find('Zulrah')then
+  begin
+    If NPC.GetAnimation = 5804 then
+      Result := True;
+  end else
+  begin
+    Debug('Zulrah might have died');
+    if (Not Reflect.Tiles.NearTile(Offset, 50))then
+      Exit(False);
+    T.Restart;
+    repeat
+      Wait(20+Random(10));
+      If NPC.Find('Zulrah')or(Not Reflect.Tiles.NearTile(Offset, 50)) then
+        Exit(False);
+    until(T.ElapsedTime > 4000);
+    Result := True;
+  end;
+end;
+
+function AttackZulrah: Boolean;
+begin
+  If (interactingZulrah)or(attackTimer.ElapsedTime < 800) then
+    Exit(True);
+
+  If Not (Reflect.Login.GetClientState = 30) then
+    Exit;
+
+  If NPC.Find('Zulrah')then
+  begin
+    If InIntArray([5073, 5072, 5804], NPC.GetAnimation)then
+      Exit;
+    RotateTile(NPC.GetTile, True, 2, 2);
+    If InIntArray([5073, 5072, 5804], NPC.GetAnimation)then
+      Exit;
+    Result := interactTileOnce(NPC.GetTile, 'Attack Zulrah', 'Attack Zulrah', 5, Mouse_Right, 0, -30, -20, False);
+    If Result then
+      attackTimer.Restart;
+  end;
+end;
+
+Procedure DodgeZulRah(Where: Integer);
+var
+  T: TTile;
+  Animation: Integer;
+  ExitTimer: TReflectTimer;
+begin
+  If (Not InDodgeArea)or(Not (Reflect.Login.GetClientState = 30)) then
+    Exit;
+  Debug('Dodge procedure started');
+  If NPC.Find('Zulrah')then
+    Animation := NPC.GetAnimation;
+  ExitTimer.Restart;
+  repeat
+    If NPC.Find('Zulrah')then
+    begin
+      Animation := NPC.GetAnimation;
+      If InIntArray([5807, 5806], Animation)then
+      begin
+        Debug('Time to move');
+        T := getDodgeTile(Where);
+        If NextPhase then
+          Exit;
+        If (Reflect.Tiles.DistanceFromTile(T) > 0)then
+        begin
+          ClickTile(T);
+          Wait(230+Random(75));
+          If NextPhase then
+            Exit;
+          If TileOnMS(NPC.GetTile)then
+          begin
+            interactTileOnce(NPC.GetTile, 'Attack Zulrah', 'Attack Zulrah', 5, Mouse_Right, 0, -30, -20, False);
+            Eat;
+          end else
+            RotateTile(NPC.GetTile, False);
+
+        end;
+        If NextPhase then
+          Exit;
+        Debug('Enters loop');
+        repeat
+          If Not NPC.Find('Zulrah')then
+            Break
+          else
+            Animation := NPC.GetAnimation;
+          Wait(10+Random(10));
+        until(InIntArray([5073, 5072, -1, 5804], Animation))or(not (Reflect.Login.GetClientState = 30));
+        Debug('Out of loop');
+        If NextPhase then
+          Exit;
+      end;
+      Eat;
+      Animation := NPC.GetAnimation;
+    end;
+    If (Not Reflect.Tiles.NearTile(Offset, 50)) then
+      Exit;
+  until(NextPhase)and(ExitTimer.ElapsedTime > 3000)or(not (Reflect.Login.GetClientState = 30));
+end;
+
+
+procedure waitDistanceEx(Tile: TPoint; Dist: Integer);
+begin
+  if Not locPlayer.isMoving then
+    Wait(200+Random(100));
+  repeat
+    handle_Run;
+    Eat;
+  until(Not locPlayer.IsMoving)or(Reflect.Tiles.DistanceFromTile(Tile) <= Dist)or(NextPhase);
+end;
+
+procedure JAD;
+var
+  T: TReflectTimer;
+  CurPray: Integer;
+  B: Boolean;
+  Animation: Integer;
+  P: TPoint;
+begin
+  T.Restart;
+  CurPray := Patterns[curPattern][Index].Pray;
+  Debug('Current prayer is ' + ToStr(CurPray));
+  NPC.Find('Zulrah');
+  Debug('Entering JAD loop');
+  repeat
+    If (NPC.Find('Zulrah'))then
+    begin
+
+      Debug('Waiting for attack');
+      repeat
+        Animation := NPC.GetAnimation;
+
+        if (InIntArray([5073, 5072], Animation)and(T.ElapsedTime > 3000)) then
+          Exit;
+        If Animation = 5804 then
+          Exit;
+        If InIntArray([5069], Animation) then
+          Break;
+
+        Eat(True);
+        Reflect.KeyBoard.TypeKey(116);
+        Animation := NPC.GetAnimation;
+        if (InIntArray([5073, 5072], Animation)and(T.ElapsedTime > 3000)) then
+          Exit;
+        If Animation = 5804 then
+          Exit;
+        If InIntArray([5069], Animation) then
+          Break;
+
+        If RecoilOnJAD then
+          Recoil;
+
+        Animation := NPC.GetAnimation;
+        if (InIntArray([5073, 5072], Animation)and(T.ElapsedTime > 3000)) then
+          Exit;
+        If Animation = 5804 then
+          Exit;
+        If InIntArray([5069], Animation) then
+          Break;
+
+      until(InIntArray([5069], Animation))or(Not Reflect.Tiles.NearTile(Offset, 50))or(Not (Reflect.Login.GetClientState = 30));
+
+      if (InIntArray([5073, 5072], Animation)and(T.ElapsedTime > 3000)) then
+        Exit;
+      If Animation = 5804 then
+        Exit;
+      Debug('We''ve been attacked');
+      FTab(Gametab_Prayer);
+      case CurPray of
+        Pray_Range, Pray_RangeException:
+        begin
+          Reflect.Math.GaussBox(P.X, P.Y, 595, 332, 617, 354);  {Mage cords as we set opposite pray}
+          quickMouse(P, Mouse_Left);
+          curPray := Pray_Mage;
+        end;
+        Pray_Mage, Pray_MageException:
+        begin
+          Reflect.Math.GaussBox(P.X, P.Y, 633, 331, 652, 352);  {Range cords as we set opposite pray}
+          quickMouse(P, Mouse_Left);
+          curPray := Pray_Range;
+        end;
+      end;
+
+      Debug('Switched pray waiting for NULL animation');
+      repeat
+        Wait(5+Random(5));
+      until(InIntArray([-1, 5073, 5072, 5804], NPC.GetAnimation))or(Not Reflect.Tiles.NearTile(Offset, 50))or(Not (Reflect.Login.GetClientState = 30));
+      Debug('Wait over');
+      if not InIntArray([5073, 5072, 5804], NPC.GetAnimation)then
+      begin
+        If (Reflect.Tiles.DistanceFromTile(getTile(Patterns[curPattern][Index].WalkTile)) > 0) then
+          FixPos(Patterns[curPattern][Index].WalkTile)
+        else
+        If TileOnMS(NPC.GetTile)then
+        begin
+          If Not interactingZulrah then
+            interactTileOnce(NPC.GetTile, 'Attack Zulrah', 'Attack Zulrah', 5, Mouse_Right, 0, -30, -20, False)
+        end else
+          RotateTile(NPC.GetTile);
+
+        If NPC.GetAnimation = 5804 then
+          Exit;
+      end;
+      if (Not Reflect.Tiles.NearTile(Offset, 50))then
+        Exit;
+    end;
+    If Not (Reflect.Login.GetClientState = 30) then
+      Exit;
+    If (Not Reflect.Tiles.NearTile(Offset, 50)) then
+      Exit;
+  until(NextPhase)and(T.ElapsedTime > 3000)or(Not (Reflect.Login.GetClientState = 30));
+end;
+
+Procedure PreLoop;
+var
+  OddCase: Boolean;
+  curPrayer: Integer;
+  T: TReflectTimer;
+  S: String;
+begin
+  curPattern := -1;
+  Index := 0;
+  OddCase := False;
+  eatAround := eatAt[0];
+  T.Restart;
+  If FirstPreLoop then
+  begin
+    locPlayer.WalkToTileMM(getTile(Pos_NorthEast));
+    while not locPlayer.IsMoving do
+      wait(100+Random(100));
+    Reflect.Gametab.TurnPrayer(Prayer_MysticMight, True);
+    waitDistance(getTile(Pos_NorthEast), 2);
+  end;
+  repeat
+    If Reflect.Tiles.DistanceFromTile(getTile(Pos_NorthEast)) > 2 then
+      locPlayer.WalkToTileMM(getTile(Pos_NorthEast));
+
+    Eat;
+    Potions;
+    Venom;
+    Recoil;
+
+    Form := -1;
+    If getForm then
+    begin
+      If Not (FormStr = S)then
+      begin
+        S := FormStr;
+        Debug('New zulrah form is ' + S);
+      end;
+      If (Form = Form_Melee)and(Not OddCase) then
+      begin
+        Debug('OddCase detected, Surviving until we can figure the pattern');
+        OddCase := True;
+        DodgeZulRah(Pos_NorthEast);
+      end;
+
+      If (Form = Form_Mage)then
+      begin
+        if not (curPrayer = Pray_Mage)then
+        begin
+          Pray(Pray_Mage);
+          RotateTile(NPC.GetTile, True, 2, 2, Equip_Range);
+        end;
+        curPrayer := Pray_Mage;
+        AttackZulrah;
+      end;
+
+      If (Form = Form_Range)then
+        If (Not FirstPreLoop)and(Not OddCase) then
+        begin
+          if not (curPrayer = Pray_Range)then
+            Pray(Pray_Range);
+          curPrayer := Pray_Range;
+          RotateTile(NPC.GetTile, True, 2, 2, Equip_Mage);
+        end;
+
+      If (OddCase)and(Form = Form_Range)then
+      begin
+        Debug('Last conclusion..');
+        If NPC.Find('Zulrah')then
+        begin
+          if NPC.GetTile.X < Offset.X-3 then
+          begin
+            Debug('Pattern detected -> 1');
+            curPattern := 1;
+            Exit;
+          end else
+          begin
+            Debug('Pattern detected -> 0');
+            curPattern := 0;
+            Exit;
+          end;
+        end;
+      end;
+    end;
+
+    if NPC.Find('Zulrah')and(T.ElapsedTime > 5500)then
+      if NPC.GetTile.X > Offset.X+3 then
+      begin
+        Debug('Zulrah moved from middle, we now know the pattern');
+        If getForm then
+        begin
+          If (Form = Form_Range)then
+          begin
+            Debug('Pattern detected -> 2');
+            curPattern := 2;
+            Exit;
+          end;
+
+          If (Form = Form_Mage)then
+          begin
+            Debug('Pattern detected -> 3');
+            curPattern := 3;
+            Exit;
+          end;
+        end;
+      end;
+
+    If Not locPlayer.IsMoving then
+      FixPos(Pos_NorthEast);
+    AttackZulrah;
+  until(curPattern > -1)or(zulrahDead)or(Not Reflect.Tiles.NearTile(Offset, 50))or(Not (Reflect.Login.GetClientState = 30));
+end;
+
+Procedure LoopPattern;
+var
+  T, specialCase: TReflectTimer;
+  caseMoved: Boolean;
+begin
+  FirstPreLoop := False;
+  Debug('Loop Pattern started using Pattern -> ' + ToStr(curPattern));
+  case curPattern of
+    0, 1: Index := 3;
+    2, 3: Index := 1;
+  end;
+  Debug('Index in pattern is ' + ToStr(Index));
+  T.Restart;
+  repeat
+    Case Patterns[curPattern][Index].GivenForm of
+      Form_Mage: eatAround := eatAt[0];
+      Form_Range: eatAround := eatAt[1];
+      Form_Melee: eatAround := eatAt[2];
+      Form_JAD: eatAround := eatAt[3];
+    end;
+    If (CurPattern = 0)and(Index = 7)then
+    begin
+      Debug('Special case found, we need to move during fight');
+      specialCase.Restart;
+      caseMoved := False;
+      eatAround := eatAt[0];
+    end;
+
+     {Retarted case when you need to move during the pattern}
+     If Not (((CurPattern = 0)and(Index = 7)))then
+       if (Reflect.Tiles.DistanceFromTile(getTile(Patterns[curPattern][Index].WalkTile)) > 1)then
+       begin
+         Debug('We need to move to next safespot');
+         If Not locPlayer.WalkToTileMM(getTile(Patterns[curPattern][Index].WalkTile))then
+           Debug('We didn''t move');
+       end;
+
+    Pray(Patterns[curPattern][Index].Pray);
+    Writeln(NPC.GetTile);
+    If Not (Patterns[curPattern][Index].GivenForm = Form_JAD)then
+      Case Patterns[curPattern][Index].AttackWith of
+        Attack_Range: RotateTile(getRotationTile, True, 2, 2, Equip_Range);
+        Attack_Mage: RotateTile(getRotationTile, True, 2, 2, Equip_Mage);
+      end;
+
+    If Not (Patterns[curPattern][Index].GivenForm = Form_JAD)then
+      Eat;
+    repeat
+      If (Patterns[curPattern][Index].GivenForm = Form_JAD) then
+      begin
+        JAD;
+        Break;
+      end;
+
+      If getForm then
+        If (Form = Form_Melee)and(InIntArray([Pos_NorthEast, Pos_NorthWest], Patterns[curPattern][Index].WalkTile))then
+          DodgeZulRah(Patterns[curPattern][Index].WalkTile);
+
+      If (CurPattern = 0)and(Index = 7) then
+      begin
+        If specialCase.ElapsedTime > 6000 then
+        begin
+          If Not caseMoved then
+          begin
+            caseMoved := True;
+            locPlayer.WalkToTileMM(getTile(Pos_SouthWest));
+            Wait(200+Random(200));
+            waitDistanceEx(getTile(Pos_NorthEast), 2);
+            Eat;
+            Potions;
+            RotateZulrah;
+            Venom;
+            Recoil;
+          end else
+            FixPos(Pos_SouthWest);
+        end else
+          FixPos(Pos_SouthEast);
+      end;
+      Eat;
+      AttackZulrah;
+      If Not (((CurPattern = 0)and(Index = 7)))then
+        If Not locPlayer.IsMoving then
+          FixPos(Patterns[curPattern][Index].WalkTile);
+
+      Eat;
+      If (NextPhase)and(T.ElapsedTime > 5500) then
+        Break;
+
+      Potions;
+      AttackZulrah;
+      If (NextPhase)and(T.ElapsedTime > 5500) then
+        Break;
+
+      Recoil;
+      Eat;
+      RotateZulrah;
+      If (NextPhase)and(T.ElapsedTime > 5500) then
+        Break;
+
+      Venom;
+      If (NextPhase)and(T.ElapsedTime > 5500) then
+        Break;
+
+      Recoil;
+      If (NextPhase)and(T.ElapsedTime > 5500) then
+        Break;
+
+      Eat;
+      If (NextPhase)and(T.ElapsedTime > 5500) then
+        Break;
+
+      Recoil;
+      AttackZulrah;
+      If Not (((CurPattern = 0)and(Index = 7)))then
+        If Not locPlayer.IsMoving then
+          FixPos(Patterns[curPattern][Index].WalkTile);
+
+      Recoil;
+      Eat;
+      If (NextPhase)and(T.ElapsedTime > 5500) then
+        Break;
+
+      AttackZulrah;
+      If (Not Reflect.Tiles.NearTile(Offset, 50))then
+        Exit;
+      handle_Run;
+    until((NextPhase)and(T.ElapsedTime > 5500))or(zulrahDead)or(Not (Reflect.Login.GetClientState = 30));
+    If zulrahDead then
+      Exit;
+    Debug('Next phase detected');
+    Inc(Index);
+    If Length(Patterns[curPattern]) = Index then
+    begin
+      Debug('Routine starting over!');
+      Wait(900+Random(200));
+      PreLoop;
+      Debug('Loop Pattern started using Pattern -> ' + ToStr(curPattern));
+      case curPattern of
+        0, 1: Index := 3;
+        2, 3: Index := 1;
+      end;
+    end;
+    Debug('#' + ToStr(Index));
+    T.Restart;
+  until(zulrahDead)or(Not Reflect.Tiles.NearTile(Offset, 50))or(Not (Reflect.Login.GetClientState = 30));
+end;
+
+Procedure PickUp;
+var
+  Items: TReflectGroundItemArray;
+  T: TReflectTimer;
+  I, L: Integer;
+  B: Boolean;
+begin
+  If Not (Reflect.Login.GetClientState = 30) then
+    Exit;
+  Debug('Time to loot');
+  T.Restart;
+  repeat
+    Items.GetAll;
+    Wait(300+Random(300));
+    Debug(ToStr(Length(Items)) + ' items on the ground..');
+  until(Length(Items) > 0)or(T.ElapsedTime > 30000)or(Not Reflect.Tiles.NearTile(Offset, 50));
+  Debug('Loot has appeared on the ground');
+  rand_Human;
+  Wait(400+Random(1000));
+  T.Restart;
+  Items.GetAll;
+  repeat
+    Items.GetAll;
+    If Reflect.Inv.isFull and (Length(Items) > 0)then
+    begin
+      InteractInv([FoodName], 'Eat');
+      Wait(100+Random(1000));
+    end;
+    For I:=0 to High(Items)do
+      If Reflect.Tiles.NearTile(Offset, 50) then
+        If InteractTileOnce(Items[I].GetTile, 'Take', 'Take', mouse_Left, 0, 0, 0)then
+        begin
+          rand_Human;
+          waitTillTile(Items[I].GetTile);
+        end;
+  until(Length(Items) = 0)or(T.ElapsedTime > 30000)or(Not (Reflect.Login.GetClientState = 30))or(Not Reflect.Tiles.NearTile(Offset, 50));
+end;
+
+
+Procedure KillZulrah
+begin
+  Debug('Waiting for island..');
+  Offset := Point(0, 0);
+  repeat
+    Wait(100);
+  until(getOffset);
+  Debug('Let''s do it!');
+  Wait(1300+Random(400));
+  FirstPreLoop := True;
+  PreLoop;
+  LoopPattern;
+  If Not (Reflect.Login.GetClientState = 30) then
+    Exit;
+  if (Not Reflect.Tiles.NearTile(Offset, 50))and((Reflect.Login.GetClientState = 30))then
+  begin
+    Debug('We have died!');
+    Reflect.Gametab.TurnOffAllPrayers;
+    Inc(Deaths);
+    WriteAddInfo('Deaths', 1);
+    Exit;
+  end;
+  Inc(Kills);
+  WriteAddInfo('Kills', 1);
+  Debug('Zulrah died!');
+  Reflect.Gametab.TurnOffAllPrayers;
+  Venom;
+  Equip(Equip_Mage);
+  PickUp;
+  Debug('We have collected the loot!');
+  Venom;
+  DidPet := Interface_PetDrop;
+  Debug_screen('Kill ' + ToStr(Interface_GetKillCount), 'progress\' + locPlayer.UserName + '\kills', False);
+  Teleport(Area_ClanWars);
+  Wait(400+Random(200));
+  If DidPet then
+  begin
+    Debug('We got a pet', True);
+    locPlayer.LogOut;
+    TerminateScript;
+  end;
+  Venom;
+end;

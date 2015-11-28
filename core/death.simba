@@ -1,0 +1,188 @@
+function minigame_CurrentlySelected: String;
+begin
+  Result := Reflect.Widget.GetText(76, 9);
+end;
+
+procedure minigame_ClickTeleport;
+var
+  W: TReflectWidget;
+begin
+  W.GetWidget(76, 29);
+  W.Interact(5);
+  W.Free;
+end;
+
+procedure minigame_Dropdown;
+var
+  W: TReflectWidget;
+begin
+  W.GetWidget(76, 9);
+  W.Interact(3);
+  W.Free;
+end;
+
+procedure minigame_ChooseClanWars;
+var
+  W, WC: TReflectWidget;
+begin
+  W.GetWidget(76, 19);
+  WC.GetChild(W, 5);
+  WC.Interact;
+  WC.Free;
+  W.Free;
+end;
+
+function minigame_WaitTime: Integer;
+var
+  W, WC: TReflectWidget;
+  I, tInt: Integer;
+begin
+  Result := -1;
+  W.GetWidget(162, 43);
+  For I:=0 to 3 do
+  begin
+    WC.GetChild(W, I);
+    If Pos('use the minigame teleports', WC.GetText) > 1 then
+    begin
+      tInt := StrToIntDef(Between('another ', ' minutes', WC.GetText), 0) + 1;
+      Debug(WC.GetText);
+      WC.Free;
+      W.Free;
+      Exit(tInt);
+    end;
+    WC.Free;
+  end;
+  W.Free;
+end;
+
+function minigame_NeedMove: Boolean;
+var
+  W, WC: TReflectWidget;
+  I, tInt: Integer;
+begin
+  W.GetWidget(162, 43);
+  For I:=0 to 3 do
+  begin
+    WC.GetChild(W, I);
+    If Pos('use that teleport at the moment', WC.GetText) > 1 then
+    begin
+      Debug('NeedMove ' + WC.GetText);
+      WC.Free;
+      W.Free;
+      Exit(True);
+    end;
+    WC.Free;
+  end;
+  W.Free;
+end;
+
+procedure minigame_Teleport;
+var
+  T: TReflectTimer;
+  tInt, C: Integer;
+  P: TPoint;
+begin
+  repeat
+    Tab(Gametab_QuestList);
+
+    If Not (minigame_CurrentlySelected = 'Clan Wars')then
+    begin
+      minigame_Dropdown;
+      Wait(450+Random(400));
+      minigame_ChooseClanWars;
+      Wait(450+Random(400));
+    end;
+
+    If (Not (minigame_CurrentlySelected = 'Clan Wars'))and(locPlayer.isLoggedIn)then
+    begin
+      Debug('We failed using minigame teleports', True);
+      TerminateScript;
+    end else
+      minigame_ClickTeleport;
+
+    rand_Interact;
+    T.Restart;
+    repeat
+      wait(20);
+    until(locPlayer.GetAnimation > -1)or(T.ElapsedTime > 55000)or(minigame_WaitTime > 0)or(minigame_NeedMove and (T.ElapsedTime > 4000));
+    Debug('Out of wait loop');
+    Inc(C);
+
+    If Not locPlayer.isLoggedIn then
+    begin
+      Debug('Seem to be server issues');
+      TakeBreak(1000*RandomRange(120, 240), 'Aprox loot worth: ' + ToStr(TotalValue));
+      SetupPlayer;
+    end;
+
+    if minigame_NeedMove and (T.ElapsedTime > 4000) then
+    begin
+      P := locPlayer.GetTile;
+      P := Point(P.X+RandomRange(-6, 6), P.Y+RandomRange(-6, 6));
+      walkTowards(P, 1);
+    end;
+
+    if (minigame_WaitTime > 0) then
+    begin
+      tInt := minigame_WaitTime;
+      While locPlayer.isLoggedIn do
+      begin
+        Wait(1000+Random(2000));
+        locPlayer.Logout;
+      end;
+      TakeBreak(tInt*60000, 'Aprox loot worth: ' + ToStr(TotalValue));
+      setupPlayer;
+      minigame_Teleport;
+      Exit;
+    end;
+
+    If locPlayer.GetAnimation > -1 then
+    begin
+      Debug('We are now teleporting!');
+      repeat
+        wait(100+Random(200));
+        rand_Human;
+      until(inArea = Area_Clanwars);
+      Exit;
+    end;
+
+    If (T.ElapsedTime > 55000) then
+    begin
+      debug_Screen('Longwait for teleport');
+      If (C > 7) then
+      begin
+        Debug('We failed teleporting using minigame', True);
+        TerminateScript;
+      end else
+        Debug('Let''s retry to teleport');
+    end;
+  Until(False);
+end;
+
+procedure death_GetItems;
+var
+  T, waitCollect: TReflectTimer;
+begin
+  Debug('Getting our items back');
+  T.Restart;
+  repeat
+    Equip(Equip_Base);
+    Equip(Equip_Mage);
+    if Reflect.Inv.IsFull then
+    begin
+      interactInv([FoodName], 'Eat');
+      Wait(200+Random(200));
+      rand_Human;
+    end;
+    If findCollect then
+    begin
+      waitCollect.Restart;
+      repeat
+        Wait(200+Random(100));
+      until(Interface_Open(Interface_CollectedAll))or(Interface_Open(Interface_CollectedSome))or(waitCollect.ElapsedTime > 8000);
+    end;
+  until(Interface_Open(Interface_CollectedAll))or(T.ElapsedTime > 70000);
+
+  Equip(Equip_Base);
+  Equip(Equip_Mage);
+end;

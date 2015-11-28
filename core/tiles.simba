@@ -1,0 +1,265 @@
+function getAreaTile(constValue: Integer): TPoint;
+begin
+  case constValue of
+    Area_Clanwars: Result := Point(3366, 3164);
+    Area_InsidePortal: Result := Point(3327, 4751);
+    Area_ZulAndra: Result := Point(2204, 3057);
+    Area_Lumbridge: Result := Point(3222, 3219);
+    Area_Falador: Result := Point(2970, 3341);
+    Area_Camalot: Result := Point(2758, 3477);
+    Area_Edge: Result := Point(3092, 3486);
+  end;
+end;
+
+function inArea: Integer;
+var
+  I: Integer;
+begin
+  Result := Area_Unknown;
+  For I:=0 to 6 do
+    If Reflect.Tiles.NearTile(getAreaTile(I), 80)then
+      Exit(I);
+end;
+
+function waitArea(Area: Integer): boolean;
+var
+  T: TReflectTimer;
+begin
+  T.Restart;
+  repeat
+    Wait(200+Random(300));
+  until(InArea = Area)or(T.ElapsedTime > 5000);
+  Result := (InArea = Area);
+end;
+
+function getOffset: boolean;
+begin
+  If (Reflect.Tiles.DistanceFromTile(Point(2213, 3056)) > 50)then
+    Offset := locPlayer.GetTile;
+
+  Result := (Offset.X > 0);
+end;
+
+function getTile(Tile: Integer): TTile;
+begin
+  case Tile of
+    Pos_NorthEast: Result := Point(Offset.X+4, Offset.Y+10);
+    Pos_SouthEast: Result := Point(Offset.X+4, Offset.Y+4);
+    Pos_NorthWest: Result := Point(Offset.X-4, Offset.Y+10);
+    Pos_SouthWest: Result := Point(Offset.X-4, Offset.Y+4);
+  end;
+end;
+
+function MakeCompass(Direction: Variant; EquipSomething: Integer = -1): Boolean;
+var
+  StartAngle, Angle, DirectionDeg, I: Extended;
+  Left: Boolean;
+  Mark: TReflectTimer;
+  S: TStringArray;
+  L, C: Integer;
+  Item: TReflectInvItem;
+begin
+  Result := False;
+  StartAngle := (360 - Reflect.Compass.AngleDeg);
+  if (StartAngle < 0) then
+    Exit;
+  Writeln(Direction);
+  If (EquipSomething > -1)then
+  begin
+    FTab(Gametab_Inventory);
+    Case EquipSomething of
+      Equip_Mage: S := MageEquip;
+      Equip_Range: S := RangeEquip;
+      Equip_Base: S := BaseEquip;
+    end;
+    L := Length(S);
+    C := 0;
+  end;
+  DirectionDeg := Reflect.Compass.VariantToDirection(Direction);
+  if (Reflect.Compass.MinCheck(StartAngle, DirectionDeg) <= 11.0) then
+  begin
+    Result := True;
+    If (EquipSomething > -1)then
+      Equip(EquipSomething);
+    Exit;
+  end;
+  Left := (Round((360 - StartAngle) + DirectionDeg) mod 360 <=
+    Round((StartAngle + 360) - DirectionDeg) mod 360);
+  if Left then
+    KeyDown(vk_Left)
+  else
+    KeyDown(vk_Right);
+  Wait(10);
+  Mark.Start;
+  I := 0.0;
+  repeat
+    If (Not (C = L))and(EquipSomething > -1)then
+      if Item.Find(S[C])then
+      begin
+        quickMouse(Item.GetPoint, Mouse_Left);
+        Inc(C);
+      end;
+    Angle:= (360 - Reflect.Compass.AngleDeg);
+    if (((Mark.ElapsedTime > 6000)  and (I < 1.0)) or
+        ((Mark.ElapsedTime > 10000) and (I < 2.0)) or
+        ((Mark.ElapsedTime > 14000) and (I < 3.0))) then
+    begin
+      I := I + 1.0;
+    end;
+  until ((Angle < 0) or
+    (Mark.ElapsedTime > 14000) or
+    (Reflect.Compass.MinCheck(Angle, DirectionDeg) <= (12.0 + I)));
+  if Left then
+    KeyUp(vk_Left)
+  else
+    KeyUp(VK_Right);
+  Wait(10);
+  Result := (Reflect.Compass.MinCheck(Angle, DirectionDeg) <= (14.0 + I));
+  If (Not (C = L))and(EquipSomething > -1)then
+  begin
+    Debug('We stopped spinning but we need to finish equiping');
+    repeat
+      if Item.Find(S[C])then
+        quickMouse(Item.GetPoint, Mouse_Left);
+      Inc(C);
+    until(C = L);
+  end;
+end;
+
+procedure MakePitch(Pitch: Integer);
+var
+  CurrPitch: Extended;
+  MoveUp: Boolean;
+  TimeOut: TReflectTimer;
+begin
+  CurrPitch := (TReflectionCompass.GetPitch - 128) / 25.5;
+  If InRange(Pitch, Round(CurrPitch-1.5), Round(CurrPitch+1.5))then
+    Exit;
+  if (CurrPitch - Pitch) < 0 then
+    MoveUp := True;
+  TimeOut.Start;
+  case MoveUp of
+    True:
+    begin
+      KeyDown(vk_Up);
+      while CurrPitch < Pitch do
+      begin
+        CurrPitch := (TReflectionCompass.GetPitch - 128) / 25.5;
+        if TimeOut.ElapsedTime > RandomRange(900, 1100) then
+          Break;
+      end;
+      KeyUp(vk_Up);
+    end;
+    False:
+    begin
+      KeyDown(vk_Down);
+      while CurrPitch > Pitch do
+      begin
+        CurrPitch := (TReflectionCompass.GetPitch - 128) / 25.5;
+        if TimeOut.ElapsedTime > RandomRange(900, 1100) then
+          Break;
+      end;
+      KeyUp(vk_Down);
+    end;
+  end;
+end;
+
+Procedure RotateTile(Tile: TPoint; usePitch: Boolean = True; DefaultPitch: Integer = 2; DefaultPitchRandom: Integer = 2; EquipSomething: Integer = -1);
+var
+  Angle: Extended;
+  Me: TPoint;
+begin
+  Me := locPlayer.GetTile;
+  Angle := (Degrees(ArcTan2(Tile.y - Me.y, Tile.x - Me.x))) - 90;
+  if (Angle < 0) then
+    Angle := 360 + Angle;
+  Angle := 360 - Angle;
+  MakeCompass(Angle, EquipSomething);
+  If usePitch then
+    MakePitch(DefaultPitch+Random(DefaultPitchRandom));
+end;
+
+Procedure RotateZulrah(EquipSomething: Integer = -1);
+begin
+  If NPC.Find('Zulrah')then
+    RotateTile(NPC.GetTile, False, 2, 2, EquipSomething);
+end;
+
+function getRotationTile: TPoint;
+begin
+  Case Patterns[curPattern][Index].AreaDir of
+    Dir_North: Result := Point(Offset.X, Offset.Y + 6);
+    Dir_South: Result := Point(Offset.X, Offset.Y - 4);
+    Dir_West: Result := Point(Offset.X - 7, Offset.Y + 5);
+    Dir_East: Result := Point(Offset.X + 7, Offset.Y + 5);
+  end;
+end;
+
+Procedure ClickTile(Tile: TPoint);
+var
+  P: TPoint;
+begin
+  P := Reflect.Tiles.TileToMS(Tile);
+  Reflect.Mouse.Move(P, 4, 4);
+  If Not Reflect.Text.IsUpText('alk here', 50)then
+  begin
+    Debug(Reflect.Text.GetUpText);
+    Reflect.Mouse.Click(mouse_Right);
+    Reflect.Text.ChooseOption('Walk here', 100);
+  end else
+    Reflect.Mouse.Click(mouse_Left);
+end;
+
+function inDodgeArea: boolean;
+var
+  B: TBoxArray;
+  T: TTile;
+  I: Integer;
+begin
+  B := [IntToBox(Offset.X+3, Offset.Y+5, Offset.X+8, Offset.Y+15),
+        IntToBox(Offset.X-8, Offset.Y+5, Offset.X-3, Offset.Y+15)];
+  T := locPlayer.GetTile;
+  For I:=0 to High(B)do
+   If PointInBox(T, B[I])then
+     Exit(True);
+end;
+
+function getDodgeTile(Where: Integer): TTile;
+var
+  TPA: TPointArray;
+  P: TPoint;
+begin
+  Case Where of
+    Pos_NorthEast: TPA := [Point(Offset.X+4, Offset.Y+10), Point(Offset.X+6, Offset.Y+9)];
+    Pos_NorthWest:
+    begin
+      P := locPlayer.GetTile;
+      If (P.X = Offset.X-3)and(P.Y = Offset.Y+8)then
+      begin
+        Debug('Zulrah almost tricked us into getting hit');
+        Result := Point(Offset.X-6, Offset.Y+8);
+        Exit;
+      end else
+        TPA := [Point(Offset.X-4, Offset.Y+10), Point(Offset.X-6, Offset.Y+8)];
+    end;
+    Pos_SouthEast: TPA := [Point(Offset.X+4, Offset.Y+4)];
+    Pos_SouthWest: TPA := [Point(Offset.X-4, Offset.Y+4)];
+  end;
+  SortTPAFrom(TPA, locPlayer.getTile);
+  InvertTPA(TPA);
+  Result := TPA[0];
+end;
+
+Procedure FixPos(Where: Integer);
+begin
+  If (PosTimer.ElapsedTime < 2500) then
+    Exit;
+  If (Reflect.Tiles.DistanceFromTile(getTile(Where)) > 0)then
+  begin
+    If TileOnMS(getTile(Where))then
+      ClickTile(getTile(Where))
+    else
+      locPlayer.WalkToTileMM(getTile(Where));
+    PosTimer.Restart;
+  end;
+end;

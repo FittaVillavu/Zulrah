@@ -1,0 +1,194 @@
+Procedure Equip(What: Integer);
+var
+  S: TStringArray;
+  I: Integer;
+  Item: TReflectInvItem;
+begin
+  Case What of
+    Equip_Mage: S := MageEquip;
+    Equip_Range: S := RangeEquip;
+    Equip_Base: S := BaseEquip;
+  end;
+
+  FTab(Gametab_Inventory);
+  If Random(3) = 1 then
+  begin
+    For I:=0 to High(S)do
+      If Item.Find(S[I])then
+        quickMouse(Item.GetPoint, Mouse_Left);
+  end else
+  begin
+    For I:=High(S) downto 0 do
+      If Item.Find(S[I])then
+        quickMouse(Item.GetPoint, Mouse_Left);
+  end;
+
+  If (What = Equip_Range)and(RangeRapid) then
+  begin
+    FTab(Gametab_CombatOptions);
+    Wait(100+Random(75));
+    Reflect.Mouse.Move(IntToBox(658, 257, 712, 290), Mouse_Left);
+  end;
+end;
+
+Procedure Pray(What: Integer);
+begin
+  FTab(Gametab_Prayer);
+  Case What of
+    Pray_Range:
+    begin
+      Reflect.Gametab.TurnPrayer(Prayer_ProtectFromMissiles, True);
+      Reflect.Gametab.TurnPrayer(Prayer_MysticMight, True);
+    end;
+    Pray_Mage:
+    begin
+      Reflect.Gametab.TurnPrayer(Prayer_ProtectFromMagic, True);
+      Reflect.Gametab.TurnPrayer(Prayer_EagleEye, True);
+    end;
+    Pray_MageException:
+    begin
+      Reflect.Gametab.TurnPrayer(Prayer_ProtectFromMagic, True);
+      Reflect.Gametab.TurnPrayer(Prayer_MysticMight, True);
+    end;
+    Pray_RangeException:
+    begin
+      Reflect.Gametab.TurnPrayer(Prayer_ProtectFromMissiles, True);
+      Reflect.Gametab.TurnPrayer(Prayer_MysticMight, True);
+    end;
+    Pray_None:
+    begin
+      Reflect.Gametab.TurnPrayer(Prayer_ProtectFromMagic, False);
+      Reflect.Gametab.TurnPrayer(Prayer_ProtectFromMissiles, False);
+      Reflect.Gametab.TurnPrayer(Prayer_MysticMight, True);
+    end;
+  end;
+end;
+
+procedure Eat(CheckJad: Boolean = False);
+var
+  Item: TReflectInvItem;
+begin
+  If eatTimer.ElapsedTime < 700 then
+    Exit;
+
+  If CheckJad then
+    If NPC.Find('Zulrah')then
+      If InIntArray([5069], NPC.GetAnimation)then
+        Exit;
+
+  If locPlayer.GetSkillLevel(Skill_Hitpoints) < eatAround then
+  begin
+    FTab(Gametab_Inventory);
+    If CheckJad then
+      If NPC.Find('Zulrah')then
+        If InIntArray([5069], NPC.GetAnimation)then
+          Exit;
+
+    If Item.Find(FoodName)then
+    begin
+      if NextPhase then
+        Exit;
+      If CheckJad then
+        If NPC.Find('Zulrah')then
+          If InIntArray([5069], NPC.GetAnimation)then
+            Exit;
+      quickMouse(Item.GetPoint, Mouse_Left);
+      eatTimer.Restart;
+    end;
+  end;
+end;
+
+procedure Potions;
+var
+  S: TStringArray;
+  I: Integer;
+  Item: TReflectInvItem;
+begin
+  If (drinkTimer.ElapsedTime < 2500) then
+    Exit;
+
+  If locPlayer.GetSkillLevel(Skill_Prayer) < 20 then
+  begin
+    FTab(Gametab_Inventory);
+    S := ['Prayer potion(1)', 'Prayer potion(2)', 'Prayer potion(3)', 'Prayer potion(4)'];
+    For I:=0 to High(S)do
+      If Item.Find(S[I])then
+      begin
+        quickMouse(Item.GetPoint, Mouse_Left);
+        drinkTimer.Restart;
+        Exit;
+      end;
+  end;
+end;
+
+function RecoilShattered: boolean;
+var
+  W, WC: TReflectWidget;
+  I: Integer;
+begin
+  If ringTimer.ElapsedTime < 2000 then
+    Exit;
+  W.GetWidget(162, 43);
+  For I:=0 to 20 do
+  begin
+    WC.GetChild(W, I);
+    If Pos('Your Ring of Recoil has shattered.', WC.GetText) > 0 then
+    begin
+      ringTimer.Restart;
+      WC.Free;
+      W.Free;
+      Exit(True);
+    end;
+    WC.Free;
+  end;
+  W.Free;
+end;
+
+function RecoilEquipped: boolean;
+var
+  Ring: TReflectWornEquipment;
+begin
+  Ring.AtSlot(WornEquipment_Ring);
+  Result := (Ring.ID = 2550);
+end;
+
+Procedure Recoil;
+var
+  Item: TReflectInvItem;
+begin
+  If (Not RecoilShattered)or(eatTimer.ElapsedTime < 700) then
+    Exit;
+  FTab(Gametab_Inventory);
+  If Item.Find('Ring of recoil')then
+    quickMouse(Item.GetPoint, Mouse_Left);
+end;
+
+function isVenom: Boolean;
+begin
+  Result := (Reflect.Misc.GetSetting(102) >= 1000000);
+  If Reflect.Misc.GetSetting(102) > 0 then
+    Debug('GetSetting(102) = ' + ToStr(Reflect.Misc.GetSetting(102)));
+end;
+
+procedure Venom;
+var
+  S: TStringArray;
+  I: Integer;
+  Item: TReflectInvItem;
+begin
+  If venomTimer.ElapsedTime < 5000 then
+    Exit;
+
+  If isVenom then
+  begin
+    FTab(Gametab_Inventory);
+    S := ['Anti-venom+(1)', 'Anti-venom+(2)', 'Anti-venom+(3)', 'Anti-venom+(4)'];
+    For I:=0 to High(S)do
+      If Item.Find(S[I])then
+      begin
+        quickMouse(Item.GetPoint, Mouse_Left);
+        venomTimer.Restart;
+        Exit;
+      end;
+  end;
+end;

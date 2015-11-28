@@ -1,0 +1,327 @@
+function enterPortal: boolean;
+var
+  T, waitT: TReflectTimer;
+  C: Integer;
+begin
+  If (Not (Reflect.Login.GetClientState = 30)) then
+    Exit;
+
+  If inArea = Area_InsidePortal then
+    Exit(True);
+
+  If not Reflect.Map.TileOnMM(Point(3350, 3163))then
+    walkTowards(Point(3361, 3163), 9);
+
+  If Random(3) = 0 then
+    RotateTile(Point(3351, 3164), True, 0, 0);
+
+  T.Restart;
+  repeat
+    If inArea = Area_InsidePortal then
+      Exit(True);
+    If interactTileOnce(Point(3351, 3164), 'Enter Free', 'Enter Free', 5, mouse_Right, -47, -47, 50+Random(130), False)then
+    begin
+      rand_Interact;
+      Debug('Clicked the portal..');
+      waitT.Restart;
+      repeat
+        Wait(200+Random(100));
+        rand_Human;
+        If (waitT.ElapsedTime > 1500)and(Not locPlayer.isMoving)then
+          Break;
+        If locPlayer.isMoving then
+          waitT.Restart;
+      until(inArea = Area_InsidePortal)or(waitT.ElapsedTime > 4000);
+      Result := (inArea = Area_InsidePortal);
+    end else
+    begin
+      Inc(C);
+      If Not TileOnMS(Point(3351, 3164))then
+      begin
+        Debug('Portal not on MS');
+        If inArea = Area_InsidePortal then
+          Exit(True);
+        locPlayer.WalkToTileMM(Point(3354, 3161));
+        If Random(3) = 0 then
+          RotateTile(Point(3351, 3164), True, 0, 0);
+        Wait(250+Random(200));
+        waitDistance(Point(3354, 3161), 2);
+      end else
+      begin
+        If not Reflect.Tiles.NearTile(Point(3351, 3164), 5)then
+          locPlayer.WalkToTileMM(Point(3354, 3161));
+        If Random(4) = 1 then
+          RotateTile(Point(3351, 3164), True, 0, 0);
+      end;
+    end;
+  until(Result)or(T.ElapsedTime > 90000)or(C > 20)or(Not (inArea = Area_Clanwars))or(Not locPlayer.isLoggedIn);
+  If inArea = Area_InsidePortal then
+    Exit(True);
+end;
+
+function exitPortal: boolean;
+var
+  T, waitT: TReflectTimer;
+  C: Integer;
+begin
+  If Not (Reflect.Login.GetClientState = 30) then
+    Exit;
+
+  T.Restart;
+  repeat
+    If interactTileOnce(Point(3328, 4751), 'Exit Portal', 'Exit Portal', 5, mouse_left, -97, -175, 40+Random(150))then
+    begin
+      rand_Interact;
+      Debug('Clicked the portal..');
+      waitT.Restart;
+      repeat
+        Wait(200+Random(100));
+        rand_Human;
+      until(inArea = Area_Clanwars)or(waitT.ElapsedTime > 8000);
+    end else
+    begin
+      Inc(C);
+      rand_Compass;
+    end;
+  until(T.ElapsedTime > 70000)or(C > 20)or(inArea = Area_Clanwars);
+  Result := (inArea = Area_Clanwars);
+end;
+
+function enterBank: boolean;
+var
+  T, waitT: TReflectTimer;
+  C: Integer;
+  TP: TPointArray;
+begin
+  If (Not (Reflect.Login.GetClientState = 30))or(Not (inArea = Area_Clanwars)) then
+    Exit;
+
+  If Reflect.Bank.IsOpen then
+    Exit(True);
+
+  Venom;
+  If not Reflect.Map.TileOnMM(Point(3369, 3171))then
+  begin
+    TP := [Point(3369, 3168), Point(3374, 3168), Point(3366, 3170)];
+    walkTowards(TP[Random(Length(TP))], 3);
+    If Random(3) = 0 then
+      RotateTile(Point(3369, 3171), True, 3, 6)
+    else
+      rand_Human;
+  end;
+
+  NoRecoil := (Not RecoilEquipped);
+  T.Restart;
+  repeat
+    Result := (Reflect.Bank.isOpen);
+    If (interactTileOnce(Point(3369, 3171), 'Use Bank chest', 'Use Bank chest', 8, mouse_left, 0, 0, 10+Random(20)))and(Not Result)then
+    begin
+      rand_Interact;
+      Debug('Clicked the bank chest..');
+      waitT.Restart;
+      repeat
+        Wait(200+Random(100));
+        beHuman(400);
+        If Reflect.Bank.isPinOpen then
+        begin
+          Debug('Pin screen');
+          locPlayer.EnterPin;
+          Debug('Entered pin');
+          Wait(1500+Random(1000));
+          waitT.Restart;
+        end;
+        If (waitT.ElapsedTime > 1500)and(Not locPlayer.isMoving)then
+          Break;
+      until(Reflect.Bank.isOpen)or(waitT.ElapsedTime > 4000);
+      Result := (Reflect.Bank.isOpen);
+    end else
+    begin
+      Inc(C);
+      rand_Compass;
+    end;
+  until(Result)or(T.ElapsedTime > 70000)or(C > 20)or(Not locPlayer.isLoggedIn)or(Reflect.Bank.isOpen);
+  Result := Reflect.Bank.isOpen;
+  If Result then
+    Debug('Bank is open');
+end;
+
+function findCollect: boolean;
+var
+  T: TReflectTimer;
+  C: Integer;
+begin
+  If Not (Reflect.Login.GetClientState = 30) then
+    Exit;
+
+  If not Reflect.Map.TileOnMM(Point(2213, 3056))then
+    walkTowards(Point(2210, 3056), 4);
+
+  T.Restart;
+  repeat
+    If NPC.Find(2124)then
+    If interactTileOnce(NPC.GetTile, 'Talk', 'Collect', 5, mouse_Right, 0, 0, 40+Random(50))then
+    begin
+      Debug('Collected items');
+      rand_Interact;
+      Result := Interface_Wait(Interface_Talking_Collect, 7000);
+    end else
+    begin
+      Inc(C);
+      rand_Compass;
+    end;
+  until(Result)or(T.ElapsedTime > 60000)or(C > 20);
+end;
+
+function LastClick: boolean;
+begin
+  Result := interact(IntToBox(244, 395, 275, 411), 'Continue', 'Continue', mouse_Left);
+end;
+
+function enterBoat: boolean;
+var
+  T, waitT: TReflectTimer;
+  C: Integer;
+begin
+  If Not (Reflect.Login.GetClientState = 30) then
+    Exit;
+
+  If not Reflect.Map.TileOnMM(Point(2217, 3056))then
+    walkTowards(Point(2210, 3056), 7);
+
+  If InteractInv(['Ranging potion(4)', 'Ranging potion(3)', 'Ranging potion(2)', 'Ranging potion(1)'], 'Drink')then
+  begin
+    rand_Interact;
+    wait(100+Random(500));
+  end;
+
+  If MagicPotions then
+  begin
+    Wait(600+Random(300));
+    InteractInv(['Magic potion(4)', 'Magic potion(3)', 'Magic potion(2)', 'Magic potion(1)'], 'Drink');
+    rand_Interact;
+    wait(100+Random(300));
+  end;
+
+  T.Restart;
+  repeat
+    If interactTileOnce(Point(2215, 3057), 'Board', 'Board', 5, mouse_left, 0, 0, 0)then
+    begin
+      Debug('Clicked the boat..');
+      rand_Interact;
+      waitT.Restart;
+      repeat
+        Wait(200+Random(100));
+        beHuman(400);
+      until(Interface_Wait(Interface_Boat, 3000))or(waitT.ElapsedTime > 6000);
+      If waitT.ElapsedTime < 6000 then
+      begin
+        Debug('Last interface is up, LastClick activated');
+        Wait(300+Random(300));
+        Result := (LastClick);
+      end;
+    end else
+    begin
+      Inc(C);
+      If Random(4) = 1 then
+        rand_Compass(True)
+      else
+        RotateTile(Point(2215, 3057));
+    end;
+  until(Result)or(T.ElapsedTime > 70000)or(C > 20)or(Not locPlayer.isLoggedIn);
+end;
+
+function findDuelRingSlot: Integer;
+var
+  Items: TReflectInvItemArray;
+  I: Integer;
+begin
+  Result := -1;
+  Items.GetAll;
+  For I:=0 to High(Items)do
+    If Pos('ing of dueling', Items[I].GetName) > 0 then
+      Exit(Items[I].GetInvSlot);
+end;
+
+function Teleport(Area: Integer): boolean;
+var
+  C: Integer;
+  T: TReflectTimer;
+  Inv: TReflectInvItem;
+  tInt: Integer;
+begin
+  If Not (Reflect.Login.GetClientState = 30) then
+    Exit;
+
+  repeat
+    Inc(C);
+    Case Area of
+
+      Area_Clanwars:
+      begin
+        If InIntArray([Area_Lumbridge, Area_Camalot, Area_Edge, Area_Falador], inArea)then
+        begin
+          Debug('Died trying to teleport');
+          Exit;
+        end;
+        Debug('Trying to teleport to Clan wars');
+        tInt := findDuelRingSlot;
+        If (InRange(tInt, 0, 28)) then
+        begin
+          Debug('Trying to use duel ring found in slot ' + ToStr(tInt));
+          If InteractInvSlot(tInt, 'Rub')then
+            If Interface_Wait(Interface_DuelTeleport, 3000) then
+            begin
+              Wait(300+Random(200));
+              If interact(IntToBox(199, 422, 317, 433), 'Continue', 'Continue', mouse_Left)then
+              begin
+                rand_Interact;
+                Result := waitArea(Area_Clanwars);
+              end;
+            end;
+        end else
+          Wait(1000+Random(500));
+      end;
+
+      Area_ZulAndra:
+      begin
+        Debug('Trying to teleport to Zul-Andra');
+        If Inv.Find('Zul-andra teleport')then
+        begin
+          InteractInvSlot(Inv.GetInvSlot, 'Teleport');
+          rand_Interact;
+          Result := waitArea(Area_ZulAndra);
+        end else
+        begin
+          Debug('No teleports?', True);
+          TerminateScript;
+        end;
+      end;
+    end;
+
+  until(Result)or(C > 4)or(Not locPlayer.isLoggedIn);
+  If (C > 4)and(locPlayer.isLoggedIn) then
+  begin
+    Debug('We have failed to teleport ' + ToStr(Area), True);
+    TerminateScript;
+  end else
+    Wait(800+Random(500));
+end;
+
+procedure setupPlayer;
+begin
+  locPlayer.Login;
+  rand_Human;
+  Case Random(3)of
+    0:
+    begin
+      MakePitch(8+Random(3));
+      handle_Run;
+    end;
+    1, 2:
+    begin
+      handle_Run;
+      MakePitch(8+Random(3));
+    end;
+  end;
+  rand_Human;
+end;

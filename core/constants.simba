@@ -1,0 +1,46 @@
+const
+  {Area constants}
+  Area_Unknown = -1;
+  Area_Clanwars = 0;
+  Area_InsidePortal = 2;
+  Area_ZulAndra = 1;
+  Area_Lumbridge = 3;
+  Area_Falador = 4;
+  Area_Camalot = 5;
+  Area_Edge = 6;
+
+  {Direction constants}
+  Dir_North = 1;
+  Dir_South = 2;
+  Dir_West = 3;
+  Dir_East = 4;
+
+  {Form constants, value is based on ID of the NPC "Zulrah"}
+  Form_Melee = 2043;
+  Form_Range = 2042;
+  Form_Mage = 2044;
+  Form_JAD = 9999;
+
+  {Pos constants}
+  Pos_NorthEast = 0;
+  Pos_SouthEast = 1;
+  Pos_NorthWest = 2;
+  Pos_SouthWest = 3;
+
+  {Attack constant}
+  Attack_Range = 0;
+  Attack_Mage = 1;
+
+  {Pray constant}
+  Pray_Range = 4;
+  Pray_Mage = 5;
+  Pray_None = 6;
+  Pray_MageException = 7;
+  Pray_RangeException = 8;
+
+  {Equip constant}
+  Equip_Mage = 0;
+  Equip_Range = 1;
+  Equip_Base = 2;
+
+

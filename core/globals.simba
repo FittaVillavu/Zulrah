@@ -1,0 +1,633 @@
+type
+  TRandom = record
+    Chance, Min, Max: Integer;
+  end;
+
+type
+  Rotation = Record
+    WalkTile: Integer;
+    Pray, AttackWith: Integer;
+    GivenForm, AreaDir: Integer;
+  end;
+  Rotations = Array of Rotation;
+
+var
+  {Global breaking variables}
+  BreakTimer: TReflectTimer;
+  BreakAt: Integer;
+  BreakMinMax: TIntegerArray;
+  BreakDurationMinMax: TIntegerArray;
+
+  {Global NPC variable to avoid akward crashes}
+  NPC: TReflectNPC;
+
+  {Script integers}
+  Form, curPattern, eatAround, Index, AmountPrayerPots: Integer;
+  eatAt: TIntegerArray;
+
+  {Stats integers}
+  Kills, Deaths, Refills, Valuables: Integer;
+
+  {Foodname string}
+  FoodName: String;
+
+  {Offset calculation variable when moving on the zulrah island}
+  Offset: TTile;
+
+  {Stores the rotations in an array}
+  Patterns: Array [0..3] of Rotations;
+
+  {Equipment arrays}
+  BaseEquip, MageEquip, RangeEquip: TStringArray;
+
+  {Timers to avoid spam clicking stuff}
+  PosTimer, eatTimer, drinkTimer, ringTimer, venomTimer, attackTimer: TReflectTimer;
+
+  {Global booleans}
+  FirstPreLoop, RangeRapid, RecoilOnJAD, Died, DidPet, NoRecoil, MagicPotions: Boolean;
+
+  {To keep track on exact drops these are needed}
+  DropAmounts: TIntegerArray;
+  DropValue: TIntegerArray;
+  TotalValue: Integer;
+  DropArray: TStringArray = ['Tanzanite fang',
+                             'Magic fang',
+                             'Serpentine visage',
+                             'Uncut onyx',
+                             'Tanzanite mutagen',
+                             'Magma mutagen',
+                             'Dragon med helm',
+                             'Dragon halberd',
+                             'Law rune',
+                             'Death rune',
+                             'Chaos rune',
+                             'Pure essence',
+                             'Toadflax',
+                             'Snapdragon',
+                             'Dwarf weed',
+                             'Torstol',
+                             'Flax',
+                             'Snakeskin',
+                             'Dragon bolt tips',
+                             'Magic logs',
+                             'Coal',
+                             'Runite ore',
+                             'Magic seed',
+                             'Calquat tree seed',
+                             'Papaya tree seed',
+                             'Palm tree seed',
+                             'Toadflax seed',
+                             'Snapdragon seed',
+                             'Dwarf weed seed',
+                             'Torstol seed',
+                             'Spirit seed',
+                             'Crystal seed',
+                             'Dragon bones',
+                             'Coconut',
+                             'Grapes',
+                             'Zulrah''s scales',
+                             'Battlestaff',
+                             'Antidote++(4)',
+                             'Raw shark',
+                             'Mahogany plank',
+                             'Swamp tar',
+                             'Saradomin brew(4)',
+                             'Adamantite bar',
+                             'Clue scroll (elite)',
+                             'Jar of swamp',
+                             'Coins',
+                             'Uncut sapphire',
+                             'Loop half of key',
+                             'Tooth half of key',
+                             'Uncut emerald',
+                             'Uncut ruby',
+                             'Nature talisman',
+                             'Chaos talisman',
+                             'Nature rune',
+                             'Runite bar',
+                             'Rune spear',
+                             'Rune battleaxe',
+                             'Rune 2h sword',
+                             'Uncut diamond',
+                             'Rune javelin',
+                             'Silver ore',
+                             'Adamant javelin',
+                             'Rune sq shield',
+                             'Steel arrow',
+                             'Rune arrow',
+                             'Dragonstone',
+                             'Rune kiteshield',
+                             'Shield left half',
+                             'Dragon spear'];
+  DropIDs: TIntegerArray = [12922, {Tanzanite fang}
+                            12932, {Magic fang}
+                            12927, {Serpentine visage}
+                            6571, {Uncut onyx}
+                            -1, {Tanzanite mutagen}
+                            -1, {Magma mutagen}
+                            1149, {Dragon med helm}
+                            3204, {Dragon halberd}
+                            563, {Law rune}
+                            560, {Death rune}
+                            562, {Chaos rune}
+                            7936, {Pure essence}
+                            2998, {Toadflax}
+                            3000, {Snapdragon}
+                            267, {Dwarf weed}
+                            269, {Torstol}
+                            1779, {Flax}
+                            6289, {Snakeskin}
+                            9193, {Dragon bolt tips}
+                            1513, {Magic logs}
+                            453, {Coal}
+                            451, {Runite ore}
+                            5316, {Magic seed}
+                            5290, {Calquat tree seed}
+                            5288, {Papaya tree seed}
+                            5289, {Palm tree seed}
+                            5296, {Toadflax seed}
+                            5300, {Snapdragon seed}
+                            5303, {Dwarf weed seed}
+                            5304, {Torstol seed}
+                            5317, {Spirit seed}
+                            4207, {Crystal seed}
+                            536, {Dragon bones}
+                            5974, {Coconut}
+                            1987, {Grapes}
+                            12934, {Zulrah's scales}
+                            1391, {Battlestaff}
+                            5943, {Antidote++(4)}
+                            383, {Raw shark}
+                            8782, {Mahogany plank}
+                            1939, {Swamp tar}
+                            6685, {Saradomin brew(4)}
+                            2361, {Adamantite bar}
+                            -1, {Clue scroll (elite)}
+                            -1, {Jar of swamp}
+                            617, {Coins}
+                            1623, {Uncut sapphire}
+                            987, {Loop half of key}
+                            985, {Tooth half of key}
+                            1621, {Uncut emerald}
+                            1619, {Uncut ruby}
+                            1462, {Nature talisman}
+                            1452, {Chaos talisman}
+                            561, {Nature rune}
+                            2363, {Runite bar}
+                            1247, {Rune spear}
+                            1373, {Rune battleaxe}
+                            1319, {Rune 2h sword}
+                            1617, {Uncut diamond}
+                            830, {Rune javelin}
+                            442, {Silver ore}
+                            829, {Adamant javelin}
+                            1185, {Rune sq shield}
+                            886, {Steel arrow}
+                            892, {Rune arrow}
+                            1615, {Dragonstone}
+                            1201, {Rune kiteshield}
+                            2366, {Shield left half}
+                            1249 {Dragon spear}];
+
+
+Procedure setPatterns;
+begin
+  SetLength(Patterns[0], 11);
+  SetLength(Patterns[1], 11);
+  SetLength(Patterns[2], 10);
+  SetLength(Patterns[3], 11);
+
+  With Patterns[0][0] do
+  begin
+    WalkTile := Pos_NorthEast;
+    Pray := Pray_Range;
+    AttackWith := Attack_Mage;
+    GivenForm := Form_Range;
+    AreaDir := Dir_North;
+  end;
+
+  With Patterns[0][1] do
+  begin
+    WalkTile := Pos_NorthEast;
+    Pray := Pray_None;
+    AttackWith := Attack_Mage;
+    GivenForm := Form_Melee;
+    AreaDir := Dir_North;
+  end;
+
+  With Patterns[0][2] do
+  begin
+    WalkTile := Pos_NorthEast;
+    Pray := Pray_Mage;
+    AttackWith := Attack_Range;
+    GivenForm := Form_Mage;
+    AreaDir := Dir_North;
+  end;
+
+  With Patterns[0][3] do
+  begin
+    WalkTile := Pos_SouthWest;
+    Pray := Pray_Range;
+    AttackWith := Attack_Mage;
+    GivenForm := Form_Range;
+    AreaDir := Dir_South;
+  end;
+
+  With Patterns[0][4] do
+  begin
+    WalkTile := Pos_SouthWest;
+    Pray := Pray_None;
+    AttackWith := Attack_Mage;
+    GivenForm := Form_Melee;
+    AreaDir := Dir_North;
+  end;
+
+  With Patterns[0][5] do
+  begin
+    WalkTile := Pos_SouthWest;
+    Pray := Pray_Mage;
+    AttackWith := Attack_Range;
+    GivenForm := Form_Mage;
+    AreaDir := Dir_West;
+  end;
+
+  With Patterns[0][6] do
+  begin
+    WalkTile := Pos_SouthEast;
+    Pray := Pray_Range;
+    AttackWith := Attack_Mage;
+    GivenForm := Form_Range;
+    AreaDir := Dir_South;
+  end;
+
+  With Patterns[0][7] do
+  begin
+    WalkTile := Pos_SouthEast;
+    Pray := Pray_MageException;
+    AttackWith := Attack_Mage;
+    GivenForm := Form_Mage;
+    AreaDir := Dir_South;
+  end;
+
+  With Patterns[0][8] do
+  begin
+    WalkTile := Pos_NorthWest;
+    Pray := Pray_RangeException;
+    AttackWith := Attack_Mage;
+    GivenForm := Form_JAD;
+    AreaDir := Dir_West;
+  end;
+
+  With Patterns[0][9] do
+  begin
+    WalkTile := Pos_NorthWest;
+    Pray := Pray_None;
+    AttackWith := Attack_Mage;
+    GivenForm := Form_Melee;
+    AreaDir := Dir_North;
+  end;
+
+  With Patterns[0][10] do
+  begin
+    WalkTile := Pos_NorthEast;
+    Pray := Pray_Range;
+    AttackWith := Attack_Mage;
+    GivenForm := Form_Range;
+    AreaDir := Dir_North;
+  end;
+
+  With Patterns[1][0] do
+  begin
+    WalkTile := Pos_NorthEast;
+    Pray := Pray_Range;
+    AttackWith := Attack_Mage;
+    GivenForm := Form_Range;
+    AreaDir := Dir_North;
+  end;
+
+  With Patterns[1][1] do
+  begin
+    WalkTile := Pos_NorthEast;
+    Pray := Pray_None;
+    AttackWith := Attack_Mage;
+    GivenForm := Form_Melee;
+    AreaDir := Dir_North;
+  end;
+
+  With Patterns[1][2] do
+  begin
+    WalkTile := Pos_NorthEast;
+    Pray := Pray_Mage;
+    AttackWith := Attack_Range;
+    GivenForm := Form_Mage;
+    AreaDir := Dir_North;
+  end;
+
+  With Patterns[1][3] do
+  begin
+    WalkTile := Pos_SouthWest;
+    Pray := Pray_Range;
+    AttackWith := Attack_Mage;
+    GivenForm := Form_Range;
+    AreaDir := Dir_West;
+  end;
+
+  With Patterns[1][4] do
+  begin
+    WalkTile := Pos_SouthWest;
+    Pray := Pray_Mage;
+    AttackWith := Attack_Range;
+    GivenForm := Form_Mage;
+    AreaDir := Dir_South;
+  end;
+
+  With Patterns[1][5] do
+  begin
+    WalkTile := Pos_SouthWest;
+    Pray := Pray_None;
+    AttackWith := Attack_Mage;
+    GivenForm := Form_Melee;
+    AreaDir := Dir_North;
+  end;
+
+  With Patterns[1][6] do
+  begin
+    WalkTile := Pos_SouthEast;
+    Pray := Pray_Range;
+    AttackWith := Attack_Mage;
+    GivenForm := Form_Range;
+    AreaDir := Dir_East;
+  end;
+
+  With Patterns[1][7] do
+  begin
+    WalkTile := Pos_SouthWest;
+    Pray := Pray_MageException;
+    AttackWith := Attack_Mage;
+    GivenForm := Form_Mage;
+    AreaDir := Dir_South;
+  end;
+
+  With Patterns[1][8] do
+  begin
+    WalkTile := Pos_NorthWest;
+    Pray := Pray_RangeException;
+    AttackWith := Attack_Mage;
+    GivenForm := Form_JAD;
+    AreaDir := Dir_West;
+  end;
+
+  With Patterns[1][9] do
+  begin
+    WalkTile := Pos_NorthWest;
+    Pray := Pray_None;
+    AttackWith := Attack_Mage;
+    GivenForm := Form_Melee;
+    AreaDir := Dir_North;
+  end;
+
+  With Patterns[1][10] do
+  begin
+    WalkTile := Pos_NorthEast;
+    Pray := Pray_Range;
+    AttackWith := Attack_Mage;
+    GivenForm := Form_Range;
+    AreaDir := Dir_North;
+  end;
+
+  With Patterns[2][0] do
+  begin
+    WalkTile := Pos_NorthEast;
+    Pray := Pray_Range;
+    AttackWith := Attack_Mage;
+    GivenForm := Form_Range;
+    AreaDir := Dir_North;
+  end;
+
+  With Patterns[2][1] do
+  begin
+    WalkTile := Pos_NorthEast;
+    Pray := Pray_Range;
+    AttackWith := Attack_Mage;
+    GivenForm := Form_Range;
+    AreaDir := Dir_East;
+  end;
+
+  With Patterns[2][2] do
+  begin
+    WalkTile := Pos_NorthWest;
+    Pray := Pray_None;
+    AttackWith := Attack_Mage;
+    GivenForm := Form_Melee;
+    AreaDir := Dir_North;
+  end;
+
+  With Patterns[2][3] do
+  begin
+    WalkTile := Pos_NorthWest;
+    Pray := Pray_Mage;
+    AttackWith := Attack_Range;
+    GivenForm := Form_Mage;
+    AreaDir := Dir_West;
+  end;
+
+  With Patterns[2][4] do
+  begin
+    WalkTile := Pos_SouthEast;
+    Pray := Pray_Range;
+    AttackWith := Attack_Mage;
+    GivenForm := Form_Range;
+    AreaDir := Dir_South;
+  end;
+
+  With Patterns[2][5] do
+  begin
+    WalkTile := Pos_SouthEast;
+    Pray := Pray_Mage;
+    AttackWith := Attack_Range;
+    GivenForm := Form_Mage;
+    AreaDir := Dir_East;
+  end;
+
+  With Patterns[2][6] do
+  begin
+    WalkTile := Pos_SouthWest;
+    Pray := Pray_Range;
+    AttackWith := Attack_Mage;
+    GivenForm := Form_Range;
+    AreaDir := Dir_North;
+  end;
+
+  With Patterns[2][7] do
+  begin
+    WalkTile := Pos_SouthWest;
+    Pray := Pray_Range;
+    AttackWith := Attack_Mage;
+    GivenForm := Form_Range;
+    AreaDir := Dir_West;
+  end;
+
+  With Patterns[2][8] do
+  begin
+    WalkTile := Pos_NorthEast;
+    Pray := Pray_MageException;
+    AttackWith := Attack_Mage;
+    GivenForm := Form_Mage;
+    AreaDir := Dir_North;
+  end;
+
+  With Patterns[2][9] do
+  begin
+    WalkTile := Pos_NorthEast;
+    Pray := Pray_MageException;
+    AttackWith := Attack_Mage;
+    GivenForm := Form_JAD;
+    AreaDir := Dir_East;
+  end;
+
+  With Patterns[3][0] do
+  begin
+    WalkTile := Pos_NorthEast;
+    Pray := Pray_Range;
+    AttackWith := Attack_Mage;
+    GivenForm := Form_Range;
+    AreaDir := Dir_North;
+  end;
+
+  With Patterns[3][1] do
+  begin
+    WalkTile := Pos_NorthEast;
+    Pray := Pray_Mage;
+    AttackWith := Attack_Range;
+    GivenForm := Form_Mage;
+    AreaDir := Dir_East;
+  end;
+
+  With Patterns[3][2] do
+  begin
+    WalkTile := Pos_SouthWest;
+    Pray := Pray_Range;
+    AttackWith := Attack_Mage;
+    GivenForm := Form_Range;
+    AreaDir := Dir_South;
+  end;
+
+  With Patterns[3][3] do
+  begin
+    WalkTile := Pos_SouthWest;
+    Pray := Pray_Mage;
+    AttackWith := Attack_Range;
+    GivenForm := Form_Mage;
+    AreaDir := Dir_West;
+  end;
+
+  With Patterns[3][4] do
+  begin
+    WalkTile := Pos_SouthEast;
+    Pray := Pray_None;
+    AttackWith := Attack_Mage;
+    GivenForm := Form_Melee;
+    AreaDir := Dir_North;
+  end;
+
+  With Patterns[3][5] do
+  begin
+    WalkTile := Pos_SouthEast;
+    Pray := Pray_Range;
+    AttackWith := Attack_Mage;
+    GivenForm := Form_Range;
+    AreaDir := Dir_East;
+  end;
+
+  With Patterns[3][6] do
+  begin
+    WalkTile := Pos_SouthWest;
+    Pray := Pray_Range;
+    AttackWith := Attack_Mage;
+    GivenForm := Form_Range;
+    AreaDir := Dir_South;
+  end;
+
+  With Patterns[3][7] do
+  begin
+    WalkTile := Pos_SouthWest;
+    Pray := Pray_Mage;
+    AttackWith := Attack_Range;
+    GivenForm := Form_Mage;
+    AreaDir := Dir_West;
+  end;
+
+  With Patterns[3][8] do
+  begin
+    WalkTile := Pos_SouthEast;
+    Pray := Pray_Range;
+    AttackWith := Attack_Mage;
+    GivenForm := Form_Range;
+    AreaDir := Dir_North;
+  end;
+
+  With Patterns[3][9] do
+  begin
+    WalkTile := Pos_NorthEast;
+    Pray := Pray_MageException;
+    AttackWith := Attack_Mage;
+    GivenForm := Form_Mage;
+    AreaDir := Dir_North;
+  end;
+
+  With Patterns[3][10] do
+  begin
+    WalkTile := Pos_NorthEast;
+    Pray := Pray_MageException;
+    AttackWith := Attack_Mage;
+    GivenForm := Form_JAD;
+    AreaDir := Dir_East;
+  end;
+end;
+
+function swapIndex(Arr: TStringArray; IndexOne, IndexTwo: Integer): TStringArray;
+var
+  tStr: String;
+begin
+  Result := Arr;
+  tStr := Result[IndexOne];
+  Result[IndexOne] := Result[IndexTwo];
+  Result[IndexTwo] := tStr;
+end;
+
+function ShuffleStr(Arr: TStringArray): TStringArray;
+var
+  I: Integer;
+  tStr: TStringArray;
+begin
+  tStr := Arr;
+  For I:=0 to High(Arr)do
+    tStr := swapIndex(tStr, Random(Length(Arr)), Random(Length(Arr)));
+  Result := tStr;
+end;
+
+function getPrice(ID: Integer): Integer;
+begin
+  Result := StrToInt(Between('"overall":', ',', getPage('http://api.rsbuddy.com/grandExchange?a=guidePrice&i=' + toStr(ID))));
+end;
+
+procedure WriteAddInfo(Section: String; Value: Integer);
+var
+  tInt: Integer;
+begin
+  if (not directoryExists(ScriptPath + 'progress\' + locPlayer.UserName + '\')) then
+    forceDirectories(ScriptPath + 'progress\' + locPlayer.UserName + '\');
+  tInt := StrToIntDef(ReadINI('Info', Section, ScriptPath + 'progress\' + locPlayer.UserName + '\' + Reflect.Time.theDate(DATE_FORMAL) + '.ini'), 0);
+  WriteINI('Info', Section, ToStr(Value+tInt), ScriptPath + 'progress\' + locPlayer.UserName + '\' + Reflect.Time.theDate(DATE_FORMAL) + '.ini');
+end;
+
+function NextPhase: boolean;
+begin
+  If NPC.Find('Zulrah')then
+    Result := InIntArray([5073, 5072, 5804], NPC.GetAnimation);
+end;
+
+procedure SetNextBreak;
+begin
+  BreakAt := 60000*RandomRange(BreakMinMax[0], BreakMinMax[1]);
+end;

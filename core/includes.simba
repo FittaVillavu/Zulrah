@@ -1,0 +1,12 @@
+{$DEFINE SMART}
+{$i finclude/finclude.simba}
+{$i constants.simba}
+{$i globals.simba}
+{$i interface.simba}
+{$i random.simba}
+{$i gametab.simba}
+{$i tiles.simba}
+{$i interact.simba}
+{$i zulrah.simba}
+{$i restock.simba}
+{$i death.simba}

@@ -1,0 +1,159 @@
+{
+
+-1 for disable
+
+}
+
+const
+  Default_Hit_Number = 1;
+
+               {MouseSpeed, 1 out of *, Min speed, Max speed}
+  MouseSpecifics: TRandom   = [100, 27, 33];
+
+               {AFK routines, 1 out of *, Min wait time, Max wait time}
+  AFK: TRandom              = [10, 1000, 20000];
+
+               {RandomCompass, 1 out of *, Min spin time, Max spin time}
+  CompassMovement: TRandom  = [10, 500, 1000];
+
+               {Moves mouse off-screen, 1 out of *, min wait outside, max wait outside}
+  Mouse_OffScreen: TRandom  = [20, 100, 20000];
+
+               {Random mouse movements, 1 out of *, min move time, max move time}
+  Mouse_Movements: TRandom  = [25, 200, 2000];
+
+               {Changes to a random tab, 1 out of *}
+  TabChanges: TRandom       = [25, -1, -1];
+
+               {After each click, 10 out of * to perform a random action}
+  After_Interact: TRandom   = [13, -1, -1];
+
+               {Randomly called, 5 out of * to perform a random action}
+  Human: TRandom            = [500, -1, -1];
+
+
+function rand_MouseSpeed(skipRand: Boolean = False): boolean;
+begin
+  If MouseSpecifics.Chance = -1 then
+    Exit;
+
+  If (Random(MouseSpecifics.Chance) = Default_Hit_Number)or(skipRand) then
+  begin
+    Reflect.MouseSpeed := RandomRange(MouseSpecifics.Min, MouseSpecifics.Max);
+    Debug('Mouse speed changed to ' + ToStr(Reflect.MouseSpeed));
+    Result := True;
+  end;
+end;
+
+function rand_AFK(skipRand: Boolean = False): boolean;
+var
+  tInt: Integer;
+begin
+  If AFK.Chance = -1 then
+    Exit;
+
+  If (Random(AFK.Chance) = Default_Hit_Number)or(skipRand) then
+  begin
+    tInt := RandomRange(AFK.Min, AFK.Max);
+    Debug('Taking a small AFK session for ' + Reflect.Time.msToTime(tInt, Time_Formal));
+    Wait(tInt);
+    Result := True;
+  end;
+end;
+
+function rand_Compass(skipRand: Boolean = False): boolean;
+var
+  Keys: TIntegerArray;
+  I: Integer;
+begin
+  If CompassMovement.Chance = -1 then
+    Exit;
+
+  If (Random(CompassMovement.Chance) = Default_Hit_Number)or(skipRand) then
+  begin
+    Keys := [VK_RIGHT, VK_LEFT];
+    I := Random(2);
+
+    Wait(RandomRange(100, 250));
+    KeyDown(Keys[I]);
+    Wait(RandomRange(CompassMovement.Min, CompassMovement.Max));
+    KeyUp(Keys[I]);
+    Wait(RandomRange(200, 350));
+    Result := True;
+  end;
+end;
+
+function rand_Offscreen(skipRand: Boolean = False): boolean;
+begin
+  If Mouse_OffScreen.Chance = -1 then
+    Exit;
+
+  If (Random(Mouse_OffScreen.Chance) = Default_Hit_Number)or(skipRand) then
+  begin
+    mouseOffScreen;
+    Wait(RandomRange(Mouse_OffScreen.Min, Mouse_OffScreen.Max));
+    Result := True;
+  end;
+end;
+
+function rand_Movements(skipRand: Boolean = False): boolean;
+begin
+  If Mouse_Movements.Chance = -1 then
+    Exit;
+
+  If (Random(Mouse_Movements.Chance) = Default_Hit_Number)or(skipRand) then
+  begin
+    SleepAndMoveMouse(RandomRange(Mouse_Movements.Min, Mouse_Movements.Max));
+    Result := True;
+  end;
+end;
+
+function rand_Tab(skipRand: Boolean = False): boolean;
+var
+  tInts: TIntegerArray = [Gametab_ClanChat, Gametab_FriendsList, Gametab_IgnoreList,
+    Gametab_Logout, Gametab_Options, Gametab_Emotes, Gametab_MusicPlayer,
+    Gametab_CombatOptions, Gametab_Stats, Gametab_Inventory,
+    Gametab_WornEquipment, Gametab_Prayer, Gametab_Magic, Gametab_QuestList];
+begin
+  If TabChanges.Chance = -1 then
+    Exit;
+
+  If (Random(TabChanges.Chance) = Default_Hit_Number)or(skipRand) then
+  begin
+    Tab(Random(Length(tInts)));
+    Result := True;
+  end;
+end;
+
+function rand_Interact: boolean;
+begin
+  If After_Interact.Chance = -1 then
+    Exit;
+
+  Case Random(After_Interact.Chance) of
+    0..6: Result := rand_Movements(True);
+    7: Result := rand_AFK(True);
+    8: Result := rand_Compass(True);
+    9: Result := rand_Offscreen(True);
+  end;
+
+  If Result then
+    Debug('We did a random action after an interaction.');
+end;
+
+function rand_Human: boolean;
+begin
+  If Human.Chance = -1 then
+    Exit;
+
+  Case Random(Human.Chance) of
+    0..5: Result := rand_Movements(True);
+    6: Result := rand_Tab(True);
+    7: Result := rand_AFK(True);
+    8: Result := rand_Compass(True);
+    9: Result := rand_Offscreen(True);
+  end;
+
+  If Result then
+    Debug('We did a random action.');
+end;

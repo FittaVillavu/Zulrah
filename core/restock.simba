@@ -1,0 +1,474 @@
+procedure addDrop(Item: String; Value: Integer);
+var
+  I: Integer;
+begin
+  For I:=0 to High(dropArray)do
+    If Item = dropArray[I] then
+    begin
+      DropAmounts[I] := DropAmounts[I] + Value;
+      Exit;
+    end;
+end;
+
+function DepositItems(List: TStringArray; SkipCalc: Boolean = False): Boolean;
+var
+  Inv: TReflectInvItem;
+  ItemAmount: TReflectInvItemArray;
+  I, Amount: Integer;
+  TimeOut: TReflectTimer;
+  Items: TStringArray;
+  AmountWidget: TReflectWidget;
+begin
+  if (not Reflect.Bank.IsOpen)or(Not (Reflect.Login.GetClientState = 30)) then
+    Exit(False);
+  Items := ShuffleStr(List);
+
+  for I:=0 to High(Items) do
+    if Inv.Find(Items[I]) then
+    begin
+      if Result then
+        Wait(RandomRange(100, 200));
+
+      Amount := 1;
+      If (Inv.GetQuantity > 1) then
+        Amount := Inv.GetQuantity;
+
+      ItemAmount.Get(Items[I]);
+      If (Length(ItemAmount) > 1) then
+        Amount := Length(ItemAmount);
+
+      if Amount = 1 then
+      begin
+        Reflect.Mouse.Move(Inv.GetBox, Mouse_Left);
+        Result := True;
+        If Not SkipCalc then
+          addDrop(Items[I], 1);
+        Continue;
+      end;
+
+      Reflect.Mouse.Move(Inv.GetBox, Mouse_Right);
+      if Amount > 1 then
+      begin
+        Result := Reflect.Text.ChooseOption('Deposit-All', 200 + Random(100));
+        If Not SkipCalc then
+          addDrop(Items[I], Amount);
+        Continue;
+      end;
+
+    end;
+end;
+
+procedure HandleDeposit;
+begin
+  If Not enterBank then
+  begin
+    Debug('Failed to open bank', True);
+    TerminateScript;
+  end else
+    Wait(1000+Random(300));
+
+  If Reflect.Inv.Contains(['Tanzanite fang', 'Magic fang', 'Serpentine visage',
+                           'Uncut onyx', 'Tanzanite mutagen', 'Magma mutagen'])then
+    Inc(Valuables, 1);
+
+  DepositItems(['Anti-venom+(1)',
+                        'Prayer potion(3)',
+                        'Prayer potion(2)',
+                        'Prayer potion(1)',
+                        'Vial',
+                        'Tanzanite fang',
+                        'Magic fang',
+                        'Serpentine visage',
+                        'Uncut onyx',
+                        'Tanzanite mutagen',
+                        'Magma mutagen',
+                        'Dragon med helm',
+                        'Dragon halberd',
+                        'Law rune',
+                        'Death rune',
+                        'Chaos rune',
+                        'Pure essence',
+                        'Toadflax',
+                        'Snapdragon',
+                        'Dwarf weed',
+                        'Torstol',
+                        'Flax',
+                        'Snakeskin',
+                        'Dragon bolt tips',
+                        'Magic logs',
+                        'Coal',
+                        'Runite ore',
+                        'Magic seed',
+                        'Calquat tree seed',
+                        'Papaya tree seed',
+                        'Palm tree seed',
+                        'Toadflax seed',
+                        'Snapdragon seed',
+                        'Dwarf weed seed',
+                        'Torstol seed',
+                        'Spirit seed',
+                        'Crystal seed',
+                        'Dragon bones',
+                        'Coconut',
+                        'Grapes',
+                        'Zulrah''s scales',
+                        'Battlestaff',
+                        'Antidote++(4)',
+                        'Raw shark',
+                        'Mahogany plank',
+                        'Swamp tar',
+                        'Saradomin brew(4)',
+                        'Adamantite bar',
+                        'Clue scroll (elite)',
+                        'Jar of swamp',
+                        'Pet snakeling',
+                        'Coins',
+                        'Uncut sapphire',
+                        'Loop half of key',
+                        'Tooth half of key',
+                        'Uncut emerald',
+                        'Uncut ruby',
+                        'Nature talisman',
+                        'Chaos talisman',
+                        'Nature rune',
+                        'Runite bar',
+                        'Rune spear',
+                        'Rune battleaxe',
+                        'Rune 2h sword',
+                        'Uncut diamond',
+                        'Rune javelin',
+                        'Silver ore',
+                        'Adamant javelin',
+                        'Rune sq shield',
+                        'Steel arrow',
+                        'Rune arrow',
+                        'Dragonstone',
+                        'Rune kiteshield',
+                        'Shield left half',
+                        'Dragon spear']);
+end;
+
+Procedure unEquipHands;
+var
+  Item: TReflectWornEquipment;
+  tInt: TIntegerArray;
+  I: Integer;
+begin
+  If Random(3) = 1 then
+    tInt := [WornEquipment_Weapon, WornEquipment_Sheild]
+  else
+    tInt := [WornEquipment_Sheild, WornEquipment_Weapon]
+
+
+  For I:=0 to High(tInt)do
+  begin
+    Item.AtSlot(tInt[I]);
+    Item.Remove;
+  end;
+end;
+
+function getTridentSpot: Integer;
+var
+  Items: TReflectInvItemArray;
+  I: Integer;
+begin
+  Result := -1;
+  Items.GetAll;
+  For I:=0 to High(Items)do
+    If Pos('Trident', Items[I].GetName) > 0 then
+      Exit(Items[I].GetInvSlot);
+end;
+
+procedure restock;
+var
+  RefillTrident, NoAvas: Boolean;
+  I: Integer;
+  S: TStringArray;
+  Items: TReflectInvItemArray;
+begin
+  If Not (Reflect.Login.GetClientState = 30) then
+    Exit;
+  RefillTrident := (Interface_GetTridentCharges < 400);
+  NoAvas := (Not Reflect.Inv.Contains(['Ava''s accumulator']));
+
+  If Not (Random(4) = 0) then
+    Tab(Gametab_Inventory);
+  If Reflect.Inv.Contains(['Anti-venom+(1)',
+                        'Prayer potion(3)',
+                        'Prayer potion(2)',
+                        'Prayer potion(1)',
+                        'Vial',
+                        'Tanzanite fang',
+                        'Magic fang',
+                        'Serpentine visage',
+                        'Uncut onyx',
+                        'Tanzanite mutagen',
+                        'Magma mutagen',
+                        'Dragon med helm',
+                        'Dragon halberd',
+                        'Law rune',
+                        'Death rune',
+                        'Chaos rune',
+                        'Pure essence',
+                        'Toadflax',
+                        'Snapdragon',
+                        'Dwarf weed',
+                        'Torstol',
+                        'Flax',
+                        'Snakeskin',
+                        'Dragon bolt tips',
+                        'Magic logs',
+                        'Coal',
+                        'Runite ore',
+                        'Magic seed',
+                        'Calquat tree seed',
+                        'Papaya tree seed',
+                        'Palm tree seed',
+                        'Toadflax seed',
+                        'Snapdragon seed',
+                        'Dwarf weed seed',
+                        'Torstol seed',
+                        'Spirit seed',
+                        'Crystal seed',
+                        'Dragon bones',
+                        'Coconut',
+                        'Grapes',
+                        'Zulrah''s scales',
+                        'Battlestaff',
+                        'Antidote++(4)',
+                        'Raw shark',
+                        'Mahogany plank',
+                        'Swamp tar',
+                        'Saradomin brew(4)',
+                        'Adamantite bar',
+                        'Clue scroll (elite)',
+                        'Jar of swamp',
+                        'Pet snakeling',
+                        'Coins',
+                        'Uncut sapphire',
+                        'Loop half of key',
+                        'Tooth half of key',
+                        'Uncut emerald',
+                        'Uncut ruby',
+                        'Nature talisman',
+                        'Chaos talisman',
+                        'Nature rune',
+                        'Runite bar',
+                        'Rune spear',
+                        'Rune battleaxe',
+                        'Rune 2h sword',
+                        'Uncut diamond',
+                        'Rune javelin',
+                        'Silver ore',
+                        'Adamant javelin',
+                        'Rune sq shield',
+                        'Steel arrow',
+                        'Rune arrow',
+                        'Dragonstone',
+                        'Rune kiteshield',
+                        'Shield left half',
+                        'Dragon spear'])then
+    HandleDeposit;
+  If NoAvas then
+  begin
+    If Not enterBank then
+    begin
+      Debug('Failed to open bank', True);
+      TerminateScript;
+    end else
+      Wait(200+Random(300));
+    Debug('We need to withdraw AVAs');
+    If Not Reflect.Bank.Withdraw('Ava''s accumulator', 1)then
+    begin
+      Debug('No Ava''s accumulator in bank', True);
+      TerminateScript;
+    end;
+  end;
+
+  if RefillTrident then
+  begin
+    If Not enterBank then
+    begin
+      Debug('Failed to open bank', True);
+      TerminateScript;
+    end else
+      Wait(200+Random(300));
+
+    Debug('We need to refill trident!');
+    DepositItems(['Shark']);
+
+    S := ['Death rune', 'Chaos rune', 'Fire rune', 'Zulrah''s scales'];
+    For I:=0 to High(S)do
+      If Not Reflect.Bank.Withdraw(S[I], -1)then
+      begin
+        Debug('No ' + S[I] + ' in bank', True);
+        TerminateScript;
+      end;
+    Reflect.Bank.Close;
+    Wait(200+Random(100));
+
+    unEquipHands;
+
+    interactInv(['Zulrah''s scales'], 'Use');
+    InteractInvSlot(getTridentSpot, 'Trident');
+    Wait(400+Random(400));
+    InteractInvSlot(getTridentSpot, 'Check');
+    interactInv(BaseEquip, 'Wield');
+    InteractInvSlot(getTridentSpot, 'Wield');
+
+    If Not enterBank then
+    begin
+      Debug('Failed to open bank', True);
+      TerminateScript;
+    end else
+      Wait(200+Random(300));
+
+    DepositItems(['Death rune', 'Chaos rune', 'Fire rune', 'Zulrah''s scales'], True);
+    Inc(Refills);
+    WriteAddInfo('Refills', 1);
+  end;
+
+  If NoRecoil then
+  begin
+    If Not enterBank then
+    begin
+      Debug('Failed to open bank', True);
+      TerminateScript;
+    end else
+      Wait(200+Random(300));
+
+    Debug('We need to equip a recoil');
+    If Not Reflect.Bank.Withdraw('Ring of recoil', 1)then
+    begin
+      Debug('No Ring of recoil in bank', True);
+      TerminateScript;
+    end;
+    Reflect.Bank.Close;
+    Wait(900+Random(400));
+    interactInv(['Ring of recoil'], 'Wear');
+  end;
+
+  Items.Get('Prayer potion(4)');
+  If Not (Length(Items) = AmountPrayerPots) then
+  begin
+    If Not enterBank then
+    begin
+      Debug('Failed to open bank', True);
+      TerminateScript;
+    end else
+      Wait(200+Random(300));
+
+    Debug('We need a prayer potion');
+    If Not Reflect.Bank.Withdraw('Prayer potion(4)', AmountPrayerPots-Length(Items))then
+    begin
+      Debug('No Prayer potion(4) in bank', True);
+      TerminateScript;
+    end;
+  end;
+
+  If Not Reflect.Inv.Contains(['Anti-venom+(4)', 'Anti-venom+(3)', 'Anti-venom+(2)'])then
+  begin
+    If Not enterBank then
+    begin
+      Debug('Failed to open bank', True);
+      TerminateScript;
+    end else
+      Wait(200+Random(300));
+
+    Debug('We need a anti-venom+ potion');
+    If Not Reflect.Bank.Withdraw('Anti-venom+(4)', 1)then
+    begin
+      Debug('No Prayer Anti-venom+(4) in bank', True);
+      TerminateScript;
+    end;
+  end;
+
+  If Not Reflect.Inv.Contains(['Ranging potion(4)', 'Ranging potion(3)', 'Ranging potion(2)', 'Ranging potion(1)'])then
+  begin
+    If Not enterBank then
+    begin
+      Debug('Failed to open bank', True);
+      TerminateScript;
+    end else
+      Wait(200+Random(300));
+
+    Debug('We need a Ranging potion potion');
+    If Not Reflect.Bank.Withdraw('Ranging potion(4)', 1)then
+    begin
+      Debug('No Ranging potion(4) in bank', True);
+      TerminateScript;
+    end;
+  end;
+
+  If MagicPotions then
+    If Not Reflect.Inv.Contains(['Magic potion(4)', 'Magic potion(3)', 'Magic potion(2)', 'Magic potion(1)'])then
+    begin
+      If Not enterBank then
+      begin
+        Debug('Failed to open bank', True);
+        TerminateScript;
+      end else
+        Wait(200+Random(300));
+
+      Debug('We need a Magic potion');
+      If Not Reflect.Bank.Withdraw('Magic potion(4)', 1)then
+      begin
+        Debug('No Magic potion(4) in bank', True);
+        TerminateScript;
+      end;
+    end;
+
+  If findDuelRingSlot = -1 then
+  begin
+    If Not enterBank then
+    begin
+      Debug('Failed to open bank', True);
+      TerminateScript;
+    end else
+      Wait(200+Random(300));
+
+    Debug('We need a Ranging potion potion');
+    If Not Reflect.Bank.Withdraw('Ring of dueling(8)', 1)then
+    begin
+      Debug('No Ring of dueling(8) in bank', True);
+      TerminateScript;
+    end;
+  end;
+
+  If Not Reflect.Inv.Contains(['Ring of recoil'])then
+  begin
+    If Not enterBank then
+    begin
+      Debug('Failed to open bank', True);
+      TerminateScript;
+    end else
+      Wait(200+Random(300));
+
+    Debug('We need a recoil');
+    If Not Reflect.Bank.Withdraw('Ring of recoil', 1)then
+    begin
+      Debug('No Ring of recoil in bank', True);
+      TerminateScript;
+    end;
+  end;
+
+  If Not Reflect.Inv.IsFull then
+  begin
+    If Not enterBank then
+    begin
+      Debug('Failed to open bank', True);
+      TerminateScript;
+    end else
+      Wait(200+Random(300));
+
+    Debug('We need sharks');
+    If Not Reflect.Bank.Withdraw('Shark', -1)then
+    begin
+      Debug('No sharks in bank', True);
+      TerminateScript;
+    end;
+  end;
+
+  Reflect.Bank.Close;
+  Equip(Equip_Base);
+end;
